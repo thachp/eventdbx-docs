@@ -41,10 +41,10 @@
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "CLI reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "CLI documentation",
             "pages": [
               "api-reference/introduction"
             ]
