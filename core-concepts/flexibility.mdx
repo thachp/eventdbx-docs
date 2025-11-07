@@ -1,0 +1,12 @@
+---
+title: "Flexibility"
+description: "Adapt EventDBX to each bounded context without rewriting aggregates."
+---
+
+Explain how flexibility emerges from domain isolation, schema modes, and plugin selection.
+
+## Topics to cover
+
+- Show how `dbx checkout` creates per-domain state so experiments stay isolated.
+- Explain evolving aggregate shapes safely by re-snapshotting and replaying events.
+- Document how plugin payload slices let read models diverge without touching the write path.

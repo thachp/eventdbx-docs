@@ -1,0 +1,12 @@
+---
+title: "Approach a Standby & Non-distributive Database"
+description: "Design replication for warm standbys instead of multi-master clusters."
+---
+
+Clarify why EventDBX favors standby replicas and how to run them confidently.
+
+## Topics to cover
+
+- Explain the architectural model: primary write node plus promoted standbys.
+- Detail the push/pull workflow for promoting a standby in emergencies.
+- Highlight operational pitfalls such as clock skew, access tokens, and network partitions.

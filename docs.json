@@ -14,23 +14,77 @@
         "tab": "Guides",
         "groups": [
           {
-            "group": "Foundations",
+            "group": "Getting Started",
             "pages": [
               "index",
-              "features"
-            ]
-          },
-          {
-            "group": "Getting started",
-            "pages": [
+              "features",
               "quickstart",
-              "development"
+              "deployment"
             ]
           },
           {
-            "group": "Plugins",
+            "group": "Core Concepts",
             "pages": [
-              "plugins/overview"
+              "core-concepts/flexibility",
+              "core-concepts/data-integrity",
+              "core-concepts/security",
+              "core-concepts/auditability",
+              "core-concepts/extensibility"
+            ]
+          },
+          {
+            "group": "Domain Context",
+            "pages": [
+              "domain-context/ability-to-switch-between-context"
+            ]
+          },
+          {
+            "group": "Aggregate / Events",
+            "pages": [
+              "aggregate-events/snapshot",
+              "aggregate-events/aggregate",
+              "aggregate-events/events"
+            ]
+          },
+          {
+            "group": "Schema Definition",
+            "pages": [
+              "schema-definition/column-definition",
+              "schema-definition/rules",
+              "schema-definition/format"
+            ]
+          },
+          {
+            "group": "Replication",
+            "pages": [
+              "replication/standby-non-distributive",
+              "replication/watch-push-pull"
+            ]
+          },
+          {
+            "group": "Technical",
+            "pages": [
+              "technical/captain-protocol",
+              "technical/mcp-server",
+              "technical/mcp-server/xxx",
+              "technical/plugins/overview",
+              "technical/plugins/http",
+              "technical/plugins/tcp",
+              "technical/plugins/capnp",
+              "technical/plugins/process",
+              "technical/plugins/log",
+              "technical/integration/overview",
+              "technical/integration/restful",
+              "technical/integration/graphql",
+              "technical/integration/search",
+              "technical/integration/graph",
+              "technical/integration/customs"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "contributing"
             ]
           }
         ]
@@ -62,15 +116,15 @@
   },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {
