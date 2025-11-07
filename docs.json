@@ -55,7 +55,7 @@
   "navbar": {
     "links": [
       {
-        "label": "Help",
+        "label": "Submit a Bug",
         "href": "https://github.com/thachp/eventdbx/issues/new"
       }
     ]
