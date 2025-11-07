@@ -58,12 +58,7 @@
         "label": "Support",
         "href": "mailto:hi@eventdbx.com"
       }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Github",
-      "href": "https://github.com/thachp/eventdbx"
-    }
+    ]
   },
   "contextual": {
     "options": [
