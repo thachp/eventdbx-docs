@@ -1,44 +1,34 @@
-# EventDBX
+# EventDBX documentation
 
-Use the starter kit to get your docs deployed and ready to customize.
+EventDBX is an event-sourced, NoSQL write-side database that keeps every mutation as an immutable event, guards integrity with Merkle trees, and fans committed changes out through plugins so specialized services can own the read side. This repository powers the public documentation site.
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+## What’s inside
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+- **Overview & features** – learn why EventDBX focuses on the write side of CQRS, how schemas, restriction modes, and column definitions work, and what performance looks like up to 10 M records.
+- **Quickstart** – install the `dbx` CLI, start the daemon, define schemas, issue tokens, append events, and replicate domains (push/pull/watch).
+- **Deployment & integration** – run the published Docker image, attach the TypeScript client, configure encryption keys, and monitor the Prometheus `/metrics` endpoint.
+- **Plugin framework** – configure TCP/HTTP/log/process emitters, inspect the RocksDB-backed job queue, replay events, and automate replication.
+- **CLI reference** – server lifecycle, configuration, tokens, schemas, aggregates, events, plugins, upgrades, backups, and restores—all grouped in one page.
 
-[**Follow the full quickstart guide**](https://starter.mintlify.com/quickstart)
+## Running the docs locally
 
-## Development
-
-Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
-
-```
-npm i -g mint
-```
-
-Run the following command at the root of your documentation, where your `docs.json` is located:
-
-```
+```bash
+npm install -g mint
 mint dev
 ```
 
-View your local preview at `http://localhost:3000`.
+Open `http://localhost:3000` to preview changes. Edit navigation, colors, and metadata via `docs.json`.
 
-## Publishing changes
+## Contributing
 
-Install our GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app) to propagate changes from your repo to your deployment. Changes are deployed to production automatically after pushing to the default branch.
+1. **Report issues** – open a ticket with detailed reproduction steps or ideas.
+2. **Fork & clone** – create branches off `develop`.
+3. **Develop** – follow the coding standards in this repo; add/update tests where necessary.
+4. **Commit** – use [Conventional Commits](https://www.conventionalcommits.org/) (`feat: ...`, `fix: ...`, etc.).
+5. **Pull request** – target the upstream `develop` branch, describe the change, and link related issues.
 
-## Need help?
+Formatting is handled by the repo-wide Prettier configuration (`.prettierrc.json`) and commit linting via `.commitlintrc.json`.
 
-### Troubleshooting
+## License
 
-- If your dev environment isn't running: Run `mint update` to ensure you have the most recent version of the CLI.
-- If a page loads as a 404: Make sure you are running in a folder with a valid `docs.json`.
-
-### Resources
-
-- [Mintlify documentation](https://mintlify.com/docs)
+© 2025 Patrick Thach and contributors. Released under the [MIT License](./LICENSE).

@@ -1,94 +1,81 @@
+title: 'Deployment & integration'
+description: 'Run EventDBX under Docker, wire up client libraries, and operate the daemon in production.'
 ---
-title: 'Development'
-description: 'Preview changes locally to update your docs'
----
 
-<Info>
-  **Prerequisites**:
-  - Node.js version 19 or higher
-  - A docs repository with a `docs.json` file
-</Info>
+This page collects the operational bits that typically live beside the CLI quickstart: containerised runtimes, language clients, security defaults, and observability hooks.
 
-Follow these steps to install and run Mintlify on your operating system.
-
-<Steps>
-<Step title="Install the Mintlify CLI">
+## Run with Docker
 
 ```bash
-npm i -g mint
+# Pull the latest published release
+docker pull thachp/eventdbx:tagname
+
+# Start the daemon with persistent storage and required ports
+docker run \
+  --name eventdbx \
+  --detach \
+  --publish 7070:7070 \
+  --publish 6363:6363 \
+  --volume "$PWD/data:/var/lib/eventdbx" \
+  thachp/eventdbx:tagname
 ```
-</Step>
 
-<Step title="Preview locally">
+- Mount a persistent volume so Merkle trees, schemas, and queued jobs survive restarts.
+- Port `7070` exposes the HTTP API; `6363` is the control socket the CLI and plugins hit.
+- Pass `--env EVENTDBX_RESTRICT=strict` or update `config.toml` inside the volume to enforce schema validation globally.
 
-Navigate to your docs directory where your `docs.json` file is located, and run the following command:
+<Tip>The Docker image bundles the same `dbx` binary as the CLI, so you can exec into the container and run administrative commands without installing extra tooling.</Tip>
+
+## JavaScript/TypeScript client
+
+Install the official library with `pnpm add eventdbxjs` (or your preferred package manager) and bootstrap the client as soon as you have host + token details:
+
+```ts
+import { createClient } from 'eventdbxjs';
+
+const client = createClient({
+  ip: process.env.EVENTDBX_HOST,
+  port: Number(process.env.EVENTDBX_PORT) || 6363,
+  token: process.env.EVENTDBX_TOKEN,
+  verbose: true, // keep in sync with verbose_responses in config.toml
+});
+
+await client.connect();
+
+const snapshot = await client.create('person', 'p-110', 'person_registered', {
+  payload: { name: 'Jane Doe', status: 'active' },
+  metadata: { '@source': 'seed-script' },
+  note: 'seed aggregate',
+});
+
+await client.apply('person', 'p-110', 'person_contact_added', {
+  payload: { name: 'Jane Doe', status: 'active' },
+  metadata: { note: 'seed data' },
+});
+
+const history = await client.events('person', 'p-110');
+console.log('event count:', history.length);
+```
+
+Tokens can be passed inline (`--token`), exported as `EVENTDBX_TOKEN`, or minted automatically when the CLI proxies through a running server.
+
+## Security defaults
+
+- Tokens use Ed25519 signatures configured under `[auth]` in `config.toml`. Store the private key on the server only; distribute the public key to services that validate tokens.
+- Event payloads, aggregate snapshots, and `tokens.json` encrypt transparently when you provide a data-encryption key via `dbx config --dek <base64>`. Metadata (aggregate ids, Merkle roots) stays readable so plugins and integrity checks continue working.
+
+## Observability
+
+- Prometheus-compatible metrics live under `/metrics` on the HTTP port. They include request latency, plugin queue depth, and retry counters so you can wire dashboards in Grafana, Datadog, or any collector that speaks the Prometheus exposition format.
+- Use `dbx queue`, `dbx queue retry`, and `dbx queue clear` to inspect or remediate jobs that failed fan-out. Retries use exponential backoff until the plugin succeeds or the aggregate disappears.
+
+## Backups and restores
+
+Stop the server before snapshotting the data directory to avoid partial Merkle trees.
 
 ```bash
-mint dev
+dbx backup --output ~/backups/eventdbx.tar.gz
+dbx restore --input ~/backups/eventdbx.tar.gz --data-dir /var/lib/eventdbx
 ```
 
-A local preview of your documentation will be available at `http://localhost:3000`.
-
-</Step>
-</Steps>
-
-## Custom ports
-
-By default, Mintlify uses port 3000. You can customize the port Mintlify runs on by using the `--port` flag. For example, to run Mintlify on port 3333, use this command:
-
-```bash
-mint dev --port 3333
-```
-
-If you attempt to run Mintlify on a port that's already in use, it will use the next available port:
-
-```md
-Port 3000 is already in use. Trying 3001 instead.
-```
-
-## Mintlify versions
-
-Please note that each CLI release is associated with a specific version of Mintlify. If your local preview does not align with the production version, please update the CLI:
-
-```bash
-npm mint update
-```
-
-## Validating links
-
-The CLI can assist with validating links in your documentation. To identify any broken links, use the following command:
-
-```bash
-mint broken-links
-```
-
-## Deployment
-
-If the deployment is successful, you should see the following:
-
-<Frame>
-  <img src="/images/checks-passed.png" alt="Screenshot of a deployment confirmation message that says All checks have passed." style={{ borderRadius: '0.5rem' }} />
-</Frame>
-
-## Code formatting
-
-We suggest using extensions on your IDE to recognize and format MDX. If you're a VSCode user, consider the [MDX VSCode extension](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-mdx) for syntax highlighting, and [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting.
-
-## Troubleshooting
-
-<AccordionGroup>
-  <Accordion title='Error: Could not load the "sharp" module using the darwin-arm64 runtime'>
-
-    This may be due to an outdated version of node. Try the following:
-    1. Remove the currently-installed version of the CLI: `npm remove -g mint`
-    2. Upgrade to Node v19 or higher.
-    3. Reinstall the CLI: `npm i -g mint`
-  </Accordion>
-
-  <Accordion title="Issue: Encountering an unknown error">
-  
-    Solution: Go to the root of your device and delete the `~/.mintlify` folder. Then run `mint dev` again.
-  </Accordion>
-</AccordionGroup>
-
-Curious about what changed in the latest CLI version? Check out the [CLI changelog](https://www.npmjs.com/package/mintlify?activeTab=versions).
+Pass `--force` to overwrite non-empty destinations and `--data-dir` to restore into a custom path.

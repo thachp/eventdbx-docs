@@ -1,0 +1,76 @@
+---
+title: "Platform features"
+description: "Dive into EventDBX capabilities: immutable storage, validation modes, column types, and performance characteristics."
+---
+
+EventDBX focuses on the write side of CQRS so you can capture every mutation as an immutable event, recompute state on demand, and let plugins deliver data to downstream systems. This page expands on the capabilities highlighted in the overview.
+
+## Core capabilities
+
+- **Flexible JSON payloads** – events accept arbitrary JSON; scalars normalize into strings for consistent state tracking, while nested objects remain queryable through filters like `payload.status = "active"`.
+- **Immutable data structure** – once persisted, events cannot be edited or deleted. You can archive aggregates or shift them into long-term storage, but history stays intact for audits and compliance.
+- **Event sourcing and replay** – replay any aggregate with `dbx aggregate replay` to rebuild state at a point in time. Updates are expressed as events rather than in-place writes.
+- **Merkle tree integration** – every aggregate maintains a Merkle tree of its events so `dbx aggregate verify` can detect tampering by recomputing the root hash.
+- **Built-in audit trails** – administrators can issue scoped tokens for auditors, granting read-only access to selected aggregates and their events.
+- **Extensible read models** – plugins consume the job queue and can request only the slices they need (event payload, materialized state, schema, or combinations). This keeps the write path isolated from read-model concerns.
+- **Remote replication** – `dbx push`, `dbx pull`, and `dbx watch` keep domains in sync with Merkle + version checks. Divergent histories abort automatically instead of rewriting events.
+- **Observability and security** – Prometheus metrics cover HTTP traffic and plugin queue health, while Ed25519-signed tokens plus optional payload encryption protect access.
+
+## Restriction modes
+
+EventDBX enforces schemas based on the restriction mode you choose at startup (`dbx start --restrict=<mode>`):
+
+| Mode | Flag | Description |
+| --- | --- | --- |
+| **Off** | `--restrict=off` or `false` | No validation. Ideal for prototyping when schemas are still evolving. |
+| **Default** | `--restrict=default` or `true` | Validates whenever a schema exists but allows aggregates without one. Matches legacy behaviour and helps teams roll out validation gradually. |
+| **Strict** | `--restrict=strict` | Every aggregate must declare a schema before events can be appended. Missing schemas fail fast with clear errors. |
+
+Switch modes without migrating data; just restart the daemon with the desired flag.
+
+## Column definitions
+
+Schemas are powered by a `column_types` map that defines both storage type and validation rules.
+
+| Type | Accepted input | Notes |
+| --- | --- | --- |
+| `integer` | JSON numbers or strings that parse to signed 64-bit integers | Rejects values outside the `i64` range. |
+| `float` | JSON numbers or numeric strings | Stored as `f64`; accepts scientific notation. |
+| `decimal(precision,scale)` | JSON numbers or strings | Enforces total digits ≤ precision and fractional digits ≤ scale. |
+| `boolean` | JSON booleans, `0/1`, `"true"`, `"false"` | Normalized to literal `true`/`false`. |
+| `text` | UTF-8 strings | Combine with `length`, `contains`, or `regex`. |
+| `timestamp` | RFC 3339 timestamps | Normalized to UTC. |
+| `date` | `YYYY-MM-DD` strings | Parsed as calendar dates without timezones. |
+| `json` | Any JSON value | No per-field validation; store free-form payloads. |
+| `binary` | Base64-encoded strings | Rules operate on decoded byte lengths. |
+| `object` | JSON objects | Enable nested validation with the `properties` rule. |
+
+Rules you can layer on a column:
+
+- `required` – field must be present on every event payload.
+- `contains` / `does_not_contain` – substring checks for `text`.
+- `regex` – one or more patterns for `text`.
+- `format` – built-in validators such as `email`, `url`, `credit_card`, `camel_case`, `snake_case`, `pascal_case`, `upper_case_snake_case`, `country_code`, `iso_8601`, and `wgs_84`.
+- `length` – `{ "min": <usize>, "max": <usize> }` for `text` or decoded `binary` payloads.
+- `range` – `{ "min": <value>, "max": <value> }` for numeric or temporal types.
+- `properties` – nested `column_types` for `object` fields, letting you keep applying the same rule set recursively.
+
+## Aggregate operation costs
+
+Most commands boil down to a handful of RocksDB reads/writes. Use the table below when planning workloads or sizing clusters:
+
+| Operation | Time complexity | Notes |
+| --- | --- | --- |
+| `aggregate list` | O(k) | `k` = requested page size (defaults to `list_page_size`). |
+| `aggregate get` | O(log N + Eₐ + P) | One state read plus optional event scan and JSON parsing. |
+| `aggregate select` | O(log N + P_selected) | Same state read as `get`; dot-path traversal is in-memory. |
+| `aggregate apply` | O(P) | Payload validation + merge + append in one batch write. |
+| `aggregate patch` | O(log N + P + patch_ops) | Reads current state, applies JSON Patch, appends delta. |
+| `aggregate replay` | O(Eₐ) | Linear in the streamed events for that aggregate. |
+| `aggregate verify` | O(Eₐ) | Recomputes the Merkle root across events. |
+
+Staged events live in `.eventdbx/staged_events.json`. Queue them with `aggregate apply --stage`, preview with `aggregate list --stage`, and flush the entire batch via `aggregate commit` for all-or-nothing persistence.
+
+## Performance testing
+
+Performance benchmarks and workload scenarios live in the [eventdbx-perf repository](https://github.com/thachp/eventdbx-perf). Tests run on the same host with Docker-based databases, a single-threaded client, and datasets up to 10 M records. Latency numbers represent mean operation time; throughput is operations per second (converted from ns → µs). EventDBX consistently outperforms PostgreSQL (~2×), MongoDB (~3×), and SQL Server (>10×) while keeping latency below one microsecond.

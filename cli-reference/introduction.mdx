@@ -1,33 +1,103 @@
+title: 'CLI reference'
+description: 'Complete guide to the dbx command surface—lifecycle, schemas, aggregates, events, plugins, and upgrades.'
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
----
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+The `dbx` CLI is the single entry point for starting the daemon, managing schemas, writing events, and supervising plugins. Every command accepts `--config <path>` if you need to target a non-default configuration file.
 
-## Welcome
+## Server lifecycle
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+- `dbx start [--port <u16>] [--data-dir <path>] [--foreground] [--restrict=<off|default|strict>]` – launch the daemon. `default` validates when schemas exist; `strict` requires schemas for every aggregate; `off` bypasses validation entirely.
+- `dbx stop` – stop the running daemon referenced by the PID file.
+- `dbx status` – print port, PID, uptime, and restriction mode.
+- `dbx restart [start options…]` – stop then start with new options.
+- `dbx destroy [--yes]` – remove the PID file, data dir, and config after confirmation.
+- `dbx checkout -d <domain>` – switch the active domain. Creates storage roots under `<data_dir>/domains/<domain>`.
+- `dbx merge --from <domain> [--into <domain>] [--overwrite-schemas]` – copy events + schemas from one domain into another. Existing aggregates abort unless explicitly overwritten.
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+## Configuration
 
-## Authentication
+`dbx config [--port <u16>] [--data-dir <path>] [--cache-threshold <usize>] [--dek <base64>] [--list-page-size <usize>] [--page-limit <usize>] [--plugin-max-attempts <u32>] [--snapshot-threshold <u64>] [--clear-snapshot-threshold]`
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+- First invocation should set a 32-byte base64 DEK so payloads, snapshots, and `tokens.json` are encrypted.
+- `--list-page-size` changes the default page size for `aggregate list`; `--page-limit` caps any requested page.
+- `--plugin-max-attempts` controls how many retries occur before a job becomes “dead”.
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
-```
+## Tokens
+
+- `dbx token generate --group <name> --user <name> [--expiration <secs>] [--limit <writes>] [--keep-alive]`
+- `dbx token list`
+- `dbx token revoke --token <value>`
+- `dbx token refresh --token <value> [--expiration <secs>] [--limit <writes>]`
+
+Tokens are Ed25519 signed; keys live under `[auth]` in `config.toml`.
+
+## Schemas
+
+- `dbx schema create <name> --events <event1,event2,...> [--snapshot-threshold <u64>]`
+- `dbx schema add <name> --events <event1,event2,...>`
+- `dbx schema remove <name> <event>`
+- `dbx schema annotate <name> <event> [--note <text>] [--clear]`
+- `dbx schema list`
+
+Schemas are stored on disk and enforced whenever restriction mode is `default` or `strict`.
+
+## Aggregates
+
+- `dbx aggregate create --aggregate <type> --aggregate-id <id> --event <name> [--field KEY=VALUE...] [--payload <json>] [--metadata <json>] [--note <text>] [--token <value>] [--json]`
+- `dbx aggregate apply --aggregate <type> --aggregate-id <id> --event <name> --field KEY=VALUE... [--payload <json>] [--stage] [--token <value>] [--note <text>]`
+- `dbx aggregate patch --aggregate <type> --aggregate-id <id> --event <name> --patch <json> [--stage] [--token <value>] [--metadata <json>] [--note <text>]`
+- `dbx aggregate list [--skip <n>] [--take <n>] [--stage]`
+- `dbx aggregate get --aggregate <type> --aggregate-id <id> [--version <u64>] [--include-events]`
+- `dbx aggregate replay --aggregate <type> --aggregate-id <id> [--skip <n>] [--take <n>]`
+- `dbx aggregate verify --aggregate <type> --aggregate-id <id>`
+- `dbx aggregate snapshot --aggregate <type> --aggregate-id <id> [--comment <text>]`
+- `dbx aggregate archive|restore --aggregate <type> --aggregate-id <id> [--comment <text>]`
+- `dbx aggregate remove --aggregate <type> --aggregate-id <id>` – only succeeds when version is still 0.
+- `dbx aggregate commit` – flush all staged events in a single atomic batch.
+
+Complexity hints live on the [features page](/features#aggregate-operation-costs). Hot aggregates typically stay in the RocksDB block cache, keeping latency near-constant.
+
+## Events
+
+- `dbx events [--aggregate <type>] [--aggregate-id <id>] [--skip <n>] [--take <n>] [--filter <expr>] [--sort <field[:order],...>] [--json] [--include-archived|--archived-only]`
+- `dbx events --event <snowflake_id> [--json]` – omit `--event` if the first positional argument is a Snowflake id.
+- `dbx aggregate export [<type>] [--all] --output <path> [--format csv|json] [--zip] [--pretty]`
+
+`--filter` accepts SQL-like expressions (for example, `payload.status = "open" AND metadata.note LIKE "retry%"`). Prefix fields with `payload.`, `metadata.`, or `extensions.`.
+
+## Plugins and queues
+
+- `dbx plugin install|enable|disable|remove`
+- `dbx plugin config tcp|http|log|process|capnp` – choose payload slices via `--payload <all|event-only|state-only|schema-only|event-and-schema>`.
+- `dbx plugin test`
+- `dbx plugin list`
+- `dbx plugin replay <plugin> <aggregate> [<aggregate_id>]`
+- `dbx queue`, `dbx queue clear`, `dbx queue retry [--event-id <job-id>]`
+
+Queues guarantee delivery with exponential backoff. Clearing dead entries prompts for confirmation to avoid accidental loss.
+
+## Replication & automation
+
+- `dbx push <remote> [--aggregate <type>] [--id <id>]`
+- `dbx pull <remote> [--aggregate <type>] [--id <id>]`
+- `dbx watch <remote> --mode <push|pull|bidirectional> [--aggregate <type>] [--interval <secs>] [--background] [--run-once] [--skip-if-active]`
+- `dbx watch status <remote> [--all]`
+
+Replications abort if either side diverges for a given aggregate. Use `--concurrency <threads>` on push/pull to tune throughput when mirroring large domains.
+
+## Upgrades
+
+- `dbx upgrade [<version>|latest] [--no-switch] [--print-only]` – downloads the requested release to `~/.eventdbx/versions/<target>/<tag>/` and switches the active binary unless `--no-switch` is set.
+- `dbx upgrade use <version>` – jump between installed releases without downloading.
+- `dbx upgrade installed [--json]`
+- `dbx upgrade --suppress <version>` / `dbx upgrade --clear-suppress`
+- `dbx upgrade list [--limit <n>] [--json]`
+
+Versions lower than `v1.13.2` are unsupported; use `dbx upgrade@<version>` as a shortcut syntax. Set `DBX_NO_UPGRADE_CHECK=1` to silence startup reminders in automation.
+
+## Maintenance
+
+- `dbx backup --output <path> [--force]`
+- `dbx restore --input <path> [--data-dir <path>] [--force]`
+
+Always stop the daemon before running backups or restores to keep Merkle trees consistent.

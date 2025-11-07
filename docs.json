@@ -14,28 +14,23 @@
         "tab": "Guides",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Foundations",
             "pages": [
               "index",
+              "features"
+            ]
+          },
+          {
+            "group": "Getting started",
+            "pages": [
               "quickstart",
               "development"
             ]
           },
           {
-            "group": "Features",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
             "group": "Plugins",
             "pages": [
-              "plugins/cursor",
-              "plugins/claude-code",
-              "plugins/windsurf"
+              "plugins/overview"
             ]
           }
         ]
@@ -44,18 +39,9 @@
         "tab": "CLI reference",
         "groups": [
           {
-            "group": "CLI documentation",
+            "group": "Command line",
             "pages": [
               "cli-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint examples",
-            "pages": [
-              "cli-reference/endpoint/get",
-              "cli-reference/endpoint/create",
-              "cli-reference/endpoint/delete",
-              "cli-reference/endpoint/webhook"
             ]
           }
         ]

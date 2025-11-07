@@ -1,80 +1,131 @@
----
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Launch EventDBX locally, define a schema, mint tokens, and replicate a domain in minutes."
 ---
 
-## Get started in three steps
+EventDBX ships as a single CLI named `dbx`. You can run everything with `npx`, but installing globally keeps the command available everywhere. Follow these six steps to go from a clean machine to a replicated domain with a working aggregate.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
 
-### Step 1: Set up your local environment
+<Step title="Start the server">
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash
+npm install eventdbx -g
+dbx start --foreground
+```
 
-### Step 2: Deploy your changes
+- Omit `--foreground` to run as a daemon.
+- Override storage with `--data-dir <path>` (defaults to `$HOME/.eventdbx`).
+- Pick a validation mode with `--restrict=<off|default|strict>`; `default` enforces a schema when one exists.
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+</Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Step title="Switch domains (optional)">
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash
+dbx checkout -d herds
+```
 
-### Step 3: Go live
+- The default domain stores data under `<data_dir>/domains/default`.
+- Domain names are case-insensitive, alphanumeric, and may include `-` or `_`.
+- Rerunning checkout against the current domain is a no-op, so you can script context switches freely.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+</Step>
 
-## Next steps
+<Step title="Define a schema">
 
-Now that you have your docs running, explore these key features:
+```bash
+dbx schema create person \
+  --events person_created,person_updated \
+  --snapshot-threshold 100
+```
 
-<CardGroup cols={2}>
+Schemas live in `~/.eventdbx/data/schemas.json` (or your chosen `data_dir`). Inspect one at any time:
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+```bash
+dbx schema person
+```
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+```json
+{
+  "person": {
+    "aggregate": "person",
+    "snapshot_threshold": null,
+    "events": {
+      "person_created": { "fields": ["first_name", "last_name"] },
+      "person_updated": { "fields": [] }
+    },
+    "column_types": {
+      "email": { "type": "text", "required": true, "format": "email" },
+      "name": { "type": "text", "rules": { "length": { "min": "1", "max": "64" } } }
+    }
+  }
+}
+```
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+Use schemas to lock fields, hide payload slices, or freeze writes entirely (`locked: true`).
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+</Step>
 
-</CardGroup>
+<Step title="Issue a token">
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+```bash
+dbx token generate --group admin --user jane --expiration 3600
+```
+
+Tokens are signed with an Ed25519 key pair defined under `[auth]` in `config.toml`. Keep the private key secret and distribute the public key to services that validate tokens.
+
+</Step>
+
+<Step title="Append events">
+
+```bash
+dbx aggregate apply person p-002 person_updated \
+  --field name="Jane Doe" \
+  --field status=active
+```
+
+- When the server is running, the CLI proxies writes through the control socket; otherwise it writes to the local RocksDB store.
+- Filter and inspect history at any time:
+
+```bash
+dbx events --filter 'payload.status = "active"' --sort created_at:desc --take 5
+```
+
+Stream a single event as JSON via `dbx events <snowflake_id> --json`.
+
+</Step>
+
+<Step title="Replicate or sync domains">
+
+```bash
+dbx checkout -d remote1 \
+  --remote 10.0.0.42:6363 \
+  --token "$(cat ~/.eventdbx/replica.token)"
+```
+
+Push schemas first to keep validation consistent:
+
+```bash
+dbx push schema remote1
+dbx push remote1 --aggregate ledger --id ledger-001
+```
+
+Pull data back down with the same integrity checks:
+
+```bash
+dbx pull remote1 --aggregate invoice
+```
+
+Need automation? `dbx watch remote1 --mode bidirectional --interval 120 --background` runs forever (or once with `--run-once`), respects concurrency flags, and exposes state via `dbx watch status <domain>`.
+
+</Step>
+
+</Steps>
+
+## What to explore next
+
+- **Snapshot thresholds**: Omit `--snapshot-threshold` to inherit `config.toml`. Use `dbx aggregate snapshot` for manual checkpoints.
+- **Staging events**: `dbx aggregate apply --stage` queues writes in `.eventdbx/staged_events.json`. Commit them together with `dbx aggregate commit`.
+- **Verification**: `dbx aggregate verify` recomputes the Merkle root for an aggregate; mismatches point to tampering or divergent history.
+
+<Note>Every CLI command accepts `--config <path>` if you need to target an alternate configuration file.</Note>
