@@ -3,10 +3,53 @@ title: "Plugin Overview"
 description: "Introduce how plugins consume queues and emit data into other systems."
 ---
 
-Summarize plugin lifecycle, configuration, and monitoring expectations before diving into transports.
+Plugins turn EventDBX into a hub: the write path stays lean while plugins fan events out to CRMs, caches, search indexes, and analytics systems.
 
-## Topics to cover
+## Queue lifecycle
 
-- Describe the durable queue, acknowledgement model, and retry windows.
-- Show how to scope selectors so plugins only receive the slices they care about.
-- Link to transport-specific guides for deeper dives.
+1. Events commit to the append-only log.
+2. EventDBX enqueues a job per plugin selector.
+3. Plugins fetch jobs in batches, process them, then ACK or NACK.
+
+```bash
+dbx plugin list
+dbx plugin stats http-sync
+```
+
+Stats include queue depth, success rate, and last error to help operators spot trouble.
+
+## Selectors and filters
+
+Selectors decide which events a plugin receives:
+
+```toml
+selector = {
+  domain = "payments",
+  aggregates = ["invoice", "payment"],
+  include_snapshot = true,
+  include_events = true,
+  metadata = { "@region" = "us-east-1" }
+}
+```
+
+Use selectors to keep payloads small and avoid exposing sensitive fields unnecessarily.
+
+## Retries and DLQ
+
+Plugins retry failed jobs automatically. Configuration example:
+
+```toml
+retries = { max_attempts = 10, strategy = "exponential", initial_delay_ms = 500 }
+dlq = "s3://eventdbx-dlq/payments"
+```
+
+Jobs that exhaust retries land in the DLQ for manual inspection. Pair this with alerts so engineers triage within your SLA.
+
+## Deployment options
+
+- **Embedded**: plugins run in the same process as EventDBX (simple, low latency).
+- **Remote agents**: MCP-managed processes receive jobs over gRPC, ideal when plugins need extra dependencies or isolation.
+
+Choose based on operational preferences and compliance requirements.
+
+Once you understand the shared mechanics, dive into transport-specific guides for configuration and tuning tips.

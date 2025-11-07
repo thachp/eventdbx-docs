@@ -3,10 +3,53 @@ title: "Flexibility"
 description: "Adapt EventDBX to each bounded context without rewriting aggregates."
 ---
 
-Explain how flexibility emerges from domain isolation, schema modes, and plugin selection.
+EventDBX is intentionally opinionated about append-only storage yet lenient everywhere else. Domains, schema modes, selectors, and plugins form building blocks you can rearrange without touching the core event log.
 
-## Topics to cover
+## Carve up work with domains
 
-- Show how `dbx checkout` creates per-domain state so experiments stay isolated.
-- Explain evolving aggregate shapes safely by re-snapshotting and replaying events.
-- Document how plugin payload slices let read models diverge without touching the write path.
+Use domains whenever a team, product surface, or environment needs its own truth:
+
+```bash
+dbx domain create payments-prod --path /srv/dbx/payments
+dbx checkout payments-prod
+dbx status
+```
+
+Each domain keeps its own RocksDB store, Merkle trees, replication offsets, and plugin queues. Teams can experiment safely by creating `*-dev` domains that reuse only the schemas they trust.
+
+## Evolve schemas gradually
+
+Start in permissive mode to learn from production traffic, then tighten restrictions when the model stabilizes.
+
+```bash
+dbx restrict set permissive   # allow payload drift
+dbx schema column add invoice amount --type decimal --required
+dbx restrict set strict       # lock in the evolved schema
+```
+
+EventDBX never mutates historical payloads. Instead, new columns surface through snapshots and plugins once they appear often enough. Re-snapshotting an aggregate with `dbx aggregate snapshot rebuild <id>` lets you adopt the updated shape without replaying the full stream.
+
+## Route only the slices you need
+
+Plugins subscribe to selectors so services receive exactly what they can handle. For example, a billing plugin might consume aggregate metadata while a reporting plugin wants full payloads:
+
+```toml
+[plugin.billing]
+type = "http"
+selector = { domain = "payments", include_metadata = true, include_payload = false }
+
+[plugin.reporting]
+type = "capnp"
+selector = { domain = "payments", include_payload = true }
+```
+
+Selectors keep flexibility high because you can bolt on new read models without modifying the write path.
+
+## Sample workflow
+
+1. Create an experiment domain (`payments-fx-dev`) for foreign-exchange work.
+2. Copy the core schema and relax validation on new FX fields.
+3. Attach a log plugin that mirrors only FX aggregates for analysts.
+4. Once the feature stabilizes, promote the schema to `payments-prod` and rehydrate downstream stores by replaying the FX events.
+
+This pattern lets you iterate quickly while preserving EventDBX’s guarantees around durability and integrity.

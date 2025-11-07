@@ -3,10 +3,46 @@ title: "Column Definition"
 description: "Define schema columns for events and snapshots."
 ---
 
-Cover supported column types, naming conventions, and CLI helpers.
+Columns describe the shape of each event payload. EventDBX treats them as contracts: once defined, they guide validation, documentation, and downstream tooling.
 
-## Topics to cover
+## Supported types
 
-- Clarify supported column types and when to reach for each.
-- Walk through `dbx schema column add` flows and related commands.
-- Discuss validation hints, defaults, and deprecation strategies.
+- `string`, `text`, `enum`
+- `integer`, `decimal`, `float`
+- `boolean`, `timestamp`
+- `json`, `bytes`
+
+Install custom types (UUIDv7, currency) via validators if needed.
+
+## Adding columns
+
+```bash
+dbx schema column add invoice_issued amount --type decimal --required --description "Total invoice amount in minor units"
+dbx schema column add invoice_issued currency --type enum --values USD EUR GBP --default USD
+```
+
+Columns apply to future events only. Historical payloads remain untouched but will fail validation if replayed without the required fields.
+
+## Documenting ownership
+
+Use annotations so teammates know who maintains each column:
+
+```bash
+dbx schema column annotate invoice_issued amount --owner billing-team --since 2024-04-01
+```
+
+These annotations surface inside generated docs and CLI descriptions.
+
+## Deprecating fields
+
+When a column is no longer needed:
+
+```bash
+dbx schema column deprecate invoice_issued legacy_id --sunset 2024-09-01 --note "Replaced by invoice_number"
+```
+
+Deprecation warns producers while keeping historical events valid. After the sunset date, remove the column entirely if no payloads reference it.
+
+## Referencing columns in downstream systems
+
+Because schemas live in version control (`docs.json` + MDX), you can generate OpenAPI or GraphQL types automatically. Run `dbx schema export --format openapi` to share definitions with other teams.

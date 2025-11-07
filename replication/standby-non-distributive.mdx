@@ -1,12 +1,42 @@
 ---
-title: "Approach a Standby & Non-distributive Database"
+title: "Standby & Non-distributive Approach"
 description: "Design replication for warm standbys instead of multi-master clusters."
 ---
 
-Clarify why EventDBX favors standby replicas and how to run them confidently.
+EventDBX intentionally avoids multi-master replication. A single primary handles writes, while one or more standbys stay hot and ready to take over. This keeps Merkle roots deterministic and reduces the blast radius of bugs.
 
-## Topics to cover
+## Topology
 
-- Explain the architectural model: primary write node plus promoted standbys.
-- Detail the push/pull workflow for promoting a standby in emergencies.
-- Highlight operational pitfalls such as clock skew, access tokens, and network partitions.
+```
+writers → primary EventDBX
+                    ↘
+                     standby A (watch)
+                     standby B (pull on schedule)
+```
+
+- Primary: receives CLI + API writes.
+- Standby A: runs `dbx watch` for near-real-time parity.
+- Standby B: pulls snapshots nightly for DR.
+
+## Promotion workflow
+
+1. Freeze writes to the primary (disable load balancer, revoke tokens).
+2. Run `dbx integrity scan` on the standby to confirm hashes.
+3. Point clients to the standby and mint new tokens scoped to it.
+4. Once the original primary recovers, rebuild it from the promoted node using `dbx pull`.
+
+Keep a runbook with DNS, firewall, and credential changes required for promotion so the process is repeatable under stress.
+
+## Why not multi-master?
+
+- Conflicting events require application-level conflict resolution.
+- Merkle trees become ambiguous because concurrent writes arrive in different orders.
+- Operational tooling has to reason about divergent histories.
+
+By sticking to a single writer, replication stays deterministic and audits remain straightforward.
+
+## Sizing guidance
+
+- Standbys need the same disk profile as primary (or larger if you retain more snapshots).
+- Enable compression on cold standbys to save cost; decompress when promoting.
+- Monitor lag (`dbx watch status --format table`) and alert when it exceeds your RPO.

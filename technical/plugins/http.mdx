@@ -3,10 +3,57 @@ title: "HTTP Plugin"
 description: "Document the HTTP emitter and its configuration surface."
 ---
 
-Explain payload shaping, headers, and delivery guarantees for the HTTP plugin.
+The HTTP plugin POSTs events or snapshots to an HTTPS endpoint. It is the most versatile transport because almost every platform speaks HTTP.
 
-## Topics to cover
+## Minimal config
 
-- Show config examples for endpoints, authentication, and batching.
-- Discuss retry strategies, exponential backoff, and DLQ integration.
-- Highlight observability hooks such as metrics and structured logs.
+```toml
+[plugin.crm-webhook]
+type = "http"
+endpoint = "https://api.example.com/eventdbx"
+method = "POST"
+headers = { Authorization = "Bearer ${CRM_TOKEN}" }
+selector = { domain = "sales", include_payload = true }
+timeout_ms = 3000
+```
+
+## Payload format
+
+The plugin sends JSON with event, snapshot, and metadata sections:
+
+```json
+{
+  "aggregate": "invoice",
+  "id": "inv-991",
+  "event": { "type": "invoice_paid", "payload": {...}, "metadata": {...} },
+  "snapshot": {...},
+  "context": { "domain": "payments-prod", "version": 64 }
+}
+```
+
+Toggle sections via the selector (`include_snapshot`, `include_events`).
+
+## Authentication
+
+- Static bearer tokens via `headers`.
+- HMAC signing: set `signing.secret` and `header_name`; the plugin hashes the payload so receivers can verify integrity.
+- mTLS: provide `client_cert` and `client_key` if the endpoint requires mutual TLS.
+
+## Retries and DLQ
+
+```toml
+retries = { max_attempts = 8, strategy = "exponential", initial_delay_ms = 500 }
+dlq = "s3://eventdbx-dlq/http"
+```
+
+HTTP status codes 500+ trigger retries; 400-level responses are treated as permanent failures unless `retry_on_4xx = true`.
+
+## Observability
+
+Metrics exposed:
+
+- `plugin_http_requests_total{plugin="crm-webhook",status="200"}`
+- `plugin_http_latency_ms_bucket`
+- `plugin_http_retries_total`
+
+Logs include request IDs and truncated payloads for debugging. Turn on full-body logging only in non-production environments to avoid leaking sensitive data.

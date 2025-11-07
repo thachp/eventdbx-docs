@@ -1,12 +1,42 @@
 ---
-title: "Ability to Switch Between Context"
-description: "Swap domains without losing history or running parallel clusters."
+title: "Switch Between Domains"
+description: "Hop across bounded contexts without losing track of state, credentials, or replication offsets."
 ---
 
-Clarify how context switching works and why it matters for governance and developer ergonomics.
+Switching domains is a daily task for anyone running multiple environments (dev, staging, prod) or business units (payments, risk, fulfillment). EventDBX keeps every domain isolated on disk so context switches are quick yet safe.
 
-## Topics to cover
+## Checkout workflow
 
-- Demonstrate using `dbx checkout` and `dbx status` to jump between contexts.
-- Share conventions for naming domains, isolating storage directories, and avoiding footguns.
-- Describe how replication honors the active context and what happens during promotion.
+```bash
+dbx domain list
+#> payments-prod  /srv/dbx/payments-prod
+#> payments-dev   /srv/dbx/payments-dev
+
+dbx checkout payments-dev
+dbx status
+```
+
+`dbx checkout` updates the active RocksDB path, snapshots directory, config overrides, and default plugin namespace. Follow it with `dbx status` to confirm where commands will apply before you mutate data.
+
+## Naming and structure tips
+
+- Prefix domains with the product or bounded context, suffix with the environment (`orders-prod`, `orders-staging`).
+- Store data directories under `/var/lib/dbx/<domain>` or attach separate volumes per domain if you need independent backup schedules.
+- Commit a `.dbx-domain` file at the root of each repo to remind developers which domain their scripts expect.
+
+## Replication awareness
+
+Replication jobs are domain-aware. A standby that tracks `payments-prod` retains its own queue offsets. When you switch to `payments-dev`, replication commands only touch that domain:
+
+```bash
+dbx checkout payments-dev
+dbx push dev-standby
+```
+
+This isolation prevents accidental promotion of the wrong dataset during incidents.
+
+## Multi-tenant operators
+
+If you host EventDBX for multiple customers, run one domain per tenant. Combine `dbx checkout` with shell prompts (`PS1`) or terminal titles that show the active domain so humans never confuse tenants. Automation should always pass `--domain` explicitly.
+
+The end result: you can switch contexts in seconds without worrying that your commands will leak into another environment or corrupt an unrelated business line.

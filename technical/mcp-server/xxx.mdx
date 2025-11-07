@@ -1,14 +1,30 @@
 ---
-title: "MCP Server: XXX"
+title: "MCP Server: XXX Extension"
 description: "Placeholder for the experimental XXX extension."
 ---
 
-Capture design notes for the in-progress XXX capability so it has a home.
+The XXX extension explores remote attestation for plugins that process regulated data. It is experimental but lives here so design notes stay close to the MCP documentation.
 
-## Topics to cover
+## Problem statement
 
-- Define the problem this extension solves and the constraints it must respect.
-- List open design questions and decisions that still need validation.
-- Track implementation steps, owners, and rollout considerations.
+Regulated industries often require proof that only approved binaries process sensitive payloads. Today MCP ensures config consistency but does not attest to plugin integrity. XXX aims to close that gap.
 
-<Tip>Replace the XXX codename as soon as the feature has a permanent name.</Tip>
+## Proposed design
+
+1. Operators upload a signed manifest describing the expected plugin binary hash.
+2. MCP issues a nonce; plugins sign it with their embedded TPM or enclave key.
+3. MCP verifies the attestation quote against the manifest before handing out secrets.
+
+## Open questions
+
+- Which attestation mechanisms should we support first (TPM, Nitro Enclaves, SGX)?
+- How frequently should re-attestation occur without overloading clusters?
+- Should MCP revoke secrets automatically when attestation fails, or leave it to operators?
+
+## Next steps
+
+- Prototype TPM-based attestation on Linux agents.
+- Design the API surface (`mcp attestation verify`) so CI/CD can upload manifests.
+- Document fallback paths for environments without hardware-backed attestation.
+
+<Tip>Rename this page once the feature graduates from the XXX codename.</Tip>

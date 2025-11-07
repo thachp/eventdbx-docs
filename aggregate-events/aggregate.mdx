@@ -3,10 +3,47 @@ title: "Aggregates"
 description: "Model aggregates so they stay autonomous yet verifiable."
 ---
 
-Show how to define aggregate identifiers, metadata, and lifecycle boundaries.
+Aggregates are the unit of consistency inside EventDBX. They own their events, snapshots, and Merkle trees. Good aggregate design keeps writes simple and isolates failure domains.
 
-## Topics to cover
+## Naming and identifiers
 
-- Define aggregate identifiers, metadata, and lifecycle best practices.
-- Show CLI or API flows for creating aggregates and applying events.
-- Discuss anti-patterns such as coupling unrelated concerns into a single aggregate.
+- Use stable, business-meaningful IDs (`invoice-991`, `org_42`). Avoid database auto-increment integers—they leak implementation details.
+- Embed shard hints if you plan to distribute aggregates across filesystems: `order:us:10023`.
+- Store identifiers in metadata (`@tenant`, `@channel`) so plugins can route events without parsing payloads.
+
+## Lifecycle
+
+Create aggregates implicitly by applying the first event:
+
+```bash
+dbx aggregate apply invoice inv-991 invoice_issued --payload '{...}'
+```
+
+Check the current state:
+
+```bash
+dbx aggregate show invoice inv-991 --include-events 5
+```
+
+Delete operations are rare; prefer terminal events (`invoice_voided`) that mark state without removing history. If you must retire an aggregate, call `dbx aggregate tombstone <type> <id>` so downstream systems know to purge caches.
+
+## Metadata conventions
+
+```json
+{
+  "@actor": "svc-billing",
+  "@tenant": "northwind",
+  "@source": "invoice-service",
+  "@replay": false
+}
+```
+
+Reserve the `@` prefix for system metadata. Everything else belongs to your business domain. Consistent metadata enables search, audit, and replication filters.
+
+## Anti-patterns to avoid
+
+- **God aggregates**: packing unrelated concerns (billing + identity + compliance) into one aggregate explodes payload size and causes contention.
+- **Cross-aggregate transactions**: EventDBX is intentionally single-write-path. Model relationships through events (e.g., `order_paid` referencing `payment_id`) and have read models enforce constraints asynchronously.
+- **Mutable fields**: never overwrite data in place. Emit a new event (`invoice_amount_adjusted`) so the audit trail stays truthful.
+
+Thoughtful aggregate design pays dividends when you need to replay history, verify integrity, or explain how a piece of state changed over time.

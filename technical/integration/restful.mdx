@@ -3,10 +3,50 @@ title: "RESTful Integration"
 description: "Surface EventDBX data through REST endpoints."
 ---
 
-Cover API design, pagination, and caching when building REST layers on top of EventDBX.
+Many teams expose EventDBX data through REST APIs for mobile apps, partners, or internal services. Use snapshots for fast reads and events for audit-friendly endpoints.
 
-## Topics to cover
+## Designing endpoints
 
-- Show API gateway or backend-for-frontend patterns that consume EventDBX.
-- Discuss pagination, ETags, and cache validation.
-- Explain how to propagate authentication and authorization into downstream services.
+- **GET `/invoices/{id}`** → read from snapshots, include the last event version.
+- **GET `/invoices/{id}/events`** → stream events with pagination (cursor = aggregate version).
+- **POST `/invoices/{id}/adjustments`** → call the EventDBX CLI/SDK to append events.
+
+Keep responses deterministic by including `aggregate_version`, `snapshot_hash`, and `last_event_at`.
+
+## Pagination & caching
+
+Leverage HTTP caching headers:
+
+```
+ETag: "invoice:inv-991:v64"
+Last-Modified: Tue, 07 May 2024 12:00:11 GMT
+```
+
+Clients can revalidate quickly. For list endpoints, use keyset pagination (`?after=invoice:inv-991:v64`) rather than offsets to avoid skipping rows when new events arrive.
+
+## Error handling
+
+Translate CLI/SDK errors into structured HTTP responses:
+
+```json
+{
+  "code": "VALIDATION_FAILED",
+  "message": "Field amount is required",
+  "details": { "field": "amount" }
+}
+```
+
+Log the underlying EventDBX error for debugging but sanitize customer-facing messages.
+
+## Security
+
+- Authenticate with OAuth2, API keys, or mTLS; never forward EventDBX tokens directly to clients.
+- Map user roles to EventDBX scopes so the REST layer enforces authorization before hitting the write path.
+- Rate-limit POST/PUT endpoints to protect the daemon.
+
+## Tooling
+
+- Generate OpenAPI specs from your REST layer and cross-reference them with EventDBX schemas.
+- Use the official TypeScript client or gRPC bindings inside your service to minimize boilerplate.
+
+REST remains the most approachable integration for external developers, especially when paired with the auditability and versioning built into EventDBX.

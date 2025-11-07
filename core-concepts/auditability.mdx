@@ -3,10 +3,54 @@ title: "Auditability"
 description: "Trace every decision across time with append-only histories and proofs."
 ---
 
-Show how EventDBX keeps a tamper-evident record that survives reviews and regulator audits.
+EventDBX bakes auditability into the storage model. Every event carries human-readable metadata, snapshots supply quick checkpoints, and Merkle proofs give you cryptographic evidence when regulators ask “how do you know?”.
 
-## Topics to cover
+## Build complete timelines
 
-- Describe how snapshots, events, and metadata create a complete audit chain.
-- Show how to export proofs for regulators or internal review boards.
-- Include CLI sequences for retrieving, signing, and sharing aggregate histories.
+Use metadata to capture actor, channel, and reason for each event:
+
+```bash
+dbx aggregate apply person p-110 person_address_changed \
+  --payload '{"city":"New York","country":"US"}' \
+  --metadata '{
+    "@actor":"csr-22",
+    "@ticket":"INC-4922",
+    "@source":"support-portal"
+  }'
+```
+
+Later, export the full history:
+
+```bash
+dbx aggregate events person p-110 --format table
+```
+
+Include snapshots when sharing with audit teams so they can see derived state without replaying the entire list.
+
+## Generate proofs
+
+`dbx aggregate proof` emits the Merkle path needed to verify an event or snapshot:
+
+```bash
+dbx aggregate proof person p-110 --event 32 > proof.json
+```
+
+Auditors can combine `proof.json` with the aggregate’s root hash (stored in the snapshot) to verify integrity independently. Sign the proof using your organization’s key to make tampering obvious.
+
+## Tamper-evident exports
+
+When exporting data for regulators or partners:
+
+1. Generate a snapshot tarball with `dbx backup --aggregates person`.
+2. Sign the archive using `gpg --detach-sign`.
+3. Provide the signature + Merkle root in the transfer manifest.
+
+Anyone can verify the signature plus the Merkle proof to ensure nothing changed in transit.
+
+## Operational playbook
+
+- **Incident review**: pull the relevant aggregates, replay commands, and attach proofs to the RCA.
+- **Access review**: compare audit log entries with aggregate histories to confirm only authorized tokens touched sensitive data.
+- **Policy enforcement**: trigger alerts when events arrive without required metadata (e.g., missing `@actor`), or when proof verification fails.
+
+Because EventDBX never mutates prior events, you always have the source data needed to answer “what happened, when, and who did it?”.

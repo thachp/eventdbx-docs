@@ -3,10 +3,61 @@ title: "Contributing"
 description: "Guidelines for contributing code, docs, and examples to EventDBX."
 ---
 
-Lay out the contribution workflow so new collaborators can get started quickly.
+Thanks for helping improve EventDBX! This guide covers expectations for issues, pull requests, docs, and releases.
 
-## Topics to cover
+## Code of conduct
 
-- State the code of conduct and decision process.
-- Explain branching, testing, and linting expectations before opening a PR.
-- Describe how to update docs.json navigation alongside new pages.
+We follow the [Contributor Covenant](https://www.contributor-covenant.org/). Be respectful, assume best intent, and keep reviews focused on the work.
+
+## Getting started
+
+1. Fork the repo and clone it locally.
+2. Install dependencies (`pnpm install`, `cargo install`, etc. depending on the component you touch).
+3. Run the test suite relevant to your change.
+
+Use feature branches named `feature/<topic>` or `fix/<topic>` so maintainers can track work easily.
+
+## Development workflow
+
+```bash
+git checkout -b feature/new-plugin
+pnpm lint
+pnpm test
+dbx unit --all
+```
+
+- Keep commits small and descriptive.
+- Update or add tests when behavior changes.
+- Run `pnpm format` (or the applicable formatter) before opening a PR.
+
+## Documentation
+
+- Update `docs.json` when adding or renaming pages.
+- Keep frontmatter (`title`, `description`) meaningful so navigation stays clear.
+- When introducing new concepts, link to related guides so readers build context.
+
+If you spot a placeholder page, replace it with full prose/examples—future contributors will thank you.
+
+## Pull requests
+
+- Fill out the PR template, noting any breaking changes.
+- Include screenshots or CLI outputs when the change affects UX.
+- Mention the issue number (`Fixes #123`) so automation can close it.
+
+Maintainers aim to review within two business days. Feel free to ping politely if you have not heard back.
+
+## Releases
+
+Release managers cut tags weekly. To get into a release:
+
+1. Merge your PR before the code freeze (posted in `#release` channel).
+2. Update `CHANGELOG.md` under the “Unreleased” section.
+3. Verify CI pipelines are green.
+
+## Communication
+
+- Join `#eventdbx-dev` on Slack for quick questions.
+- File issues for bugs or feature requests; include reproduction steps and logs.
+- Use Discussions for RFCs or architectural proposals.
+
+We appreciate every fix, doc improvement, or idea—thank you for investing in EventDBX!

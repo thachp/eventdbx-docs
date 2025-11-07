@@ -3,10 +3,47 @@ title: "MCP Server"
 description: "Describe the Model Control Plane (MCP) server responsibilities."
 ---
 
-Outline how the MCP coordinates plugins, schema pushes, and operator tooling.
+The MCP server coordinates plugins, secrets, and operational policy. Think of it as mission control for your EventDBX deployment.
 
-## Topics to cover
+## Responsibilities
 
-- Show how MCP orchestrates plugin lifecycles and distributes credentials.
-- Document deployment topologies, scaling levers, and failover expectations.
-- Reference any RPC or gRPC contracts plus versioning strategies.
+- **Plugin registry**: tracks which plugins run where, their selectors, and health checks.
+- **Secret distribution**: hands out short-lived credentials to plugins without embedding them in config files.
+- **Deployment orchestration**: publishes new schemas, rules, and plugin settings to remote agents.
+
+## Architecture
+
+```
+           ┌────────────┐
+plugins ⇄ │ MCP server │ ⇄ EventDBX domains
+           └────────────┘
+             ↑       ↑
+         operators   CI/CD
+```
+
+Operators interact with MCP via CLI or API, while CI/CD pipelines push new configurations automatically.
+
+## Example workflow
+
+1. Define a plugin in Git (`plugins/payments-http.toml`).
+2. CI calls `mcp apply plugins/payments-http.toml`.
+3. MCP stores the manifest, distributes secrets, and signals agents to restart with the new config.
+4. Agents confirm back by posting health status and build IDs.
+
+## Scaling and availability
+
+- MCP is stateless; run 2–3 replicas behind a load balancer.
+- Persist manifests in Postgres or MySQL so history survives restarts.
+- Enable TLS + mTLS to ensure only authorized agents connect.
+
+## Observability
+
+Key metrics:
+
+- `mcp_plugin_healthy_total`
+- `mcp_secret_rotations_total`
+- `mcp_agent_version_mismatch`
+
+Use these metrics to detect drift (agent running old code) or secrets approaching expiry.
+
+Coordinating plugins centrally keeps operational toil low, especially when you manage dozens of transports and environments.

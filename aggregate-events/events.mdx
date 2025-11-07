@@ -3,10 +3,54 @@ title: "Events"
 description: "Structure and evolve event payloads with confidence."
 ---
 
-Explain event versioning, metadata, and replay mechanics.
+Events are immutable facts. Each carries a type, payload, metadata, and monotonic position within the aggregate. Treat them like append-only logs rather than mutable rows.
 
-## Topics to cover
+## Designing event types
 
-- Describe event schema versioning and compatibility guarantees.
-- Show how metadata fields support tracing and idempotency.
-- Explain replaying events into plugins or external stores.
+- Use verbs in past tense (`invoice_issued`, `invoice_paid`).
+- Keep payloads focused: one event should represent a single business fact.
+- Version types explicitly (`invoice_paid.v2`) if the meaning changes drastically; otherwise, evolve schemas through optional fields.
+
+## Schema evolution
+
+Add optional fields first, then flip them to required once you are confident they always appear:
+
+```bash
+dbx schema column add invoice_paid payment_method --type string --optional
+# gather data, then
+dbx schema column update invoice_paid payment_method --required
+```
+
+For breaking changes, mint a new event type and deprecate the old one via `dbx schema deprecate`.
+
+## Metadata for traceability
+
+Include machine-readable routing hints and human context:
+
+```json
+{
+  "@actor": "svc-invoice",
+  "@correlation": "req-8821",
+  "@source": "api",
+  "@replay": false,
+  "region": "us-east-1"
+}
+```
+
+Plugins can filter on metadata without parsing payloads, and auditors can answer “who triggered this event?” instantly.
+
+## Replaying events
+
+Use events to rebuild read models or repair downstream systems:
+
+```bash
+dbx aggregate events invoice inv-991 --since 2024-05-01 --pipe ./scripts/replay-to-kafka.sh
+```
+
+When replaying into plugins, set `@replay=true` so receivers can differentiate new writes from backfills.
+
+## Idempotency
+
+Events are naturally idempotent because they never overwrite prior entries. However, when events trigger external systems (webhooks, API calls), include deterministic identifiers (`event_id`, `aggregate_id+version`) so receivers deduplicate deliveries.
+
+Well-structured events keep the write path clean and make downstream integrations predictable.

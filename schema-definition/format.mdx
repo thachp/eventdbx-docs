@@ -3,10 +3,37 @@ title: "Format"
 description: "Describe schema serialization formats and their trade-offs."
 ---
 
-Compare JSON, binary encodings, and hybrid approaches for downstream consumers.
+Event payloads default to JSON but can be re-encoded per plugin. Choosing the right format impacts latency, observability, and tooling.
 
-## Topics to cover
+## JSON
 
-- Compare JSON, Cap'n Proto, and custom payloads in terms of performance and tooling.
-- Show how to document schemas for downstream services.
-- List compatibility strategies when migrating formats.
+- Human readable and easy to debug.
+- Works well with the CLI, log plugin, and most downstream stacks.
+- Larger on disk; serialization costs show up when throughput exceeds ~50k events/min.
+
+Use JSON for prototypes, admin tools, or integrations that need transparency.
+
+## Cap'n Proto (CaPnP)
+
+- Binary format with schema evolution baked in.
+- Pair with the CaPnP plugin to emit compact frames.
+- Requires tooling support on the consumer side but delivers excellent throughput.
+
+Generate schemas automatically:
+
+```bash
+dbx schema export --format capnp --aggregate invoice > invoice.capnp
+```
+
+## Hybrid strategies
+
+- Emit JSON to logs for observability, Cap'n Proto to real-time consumers.
+- Keep snapshots in JSON for ease of inspection but stream events in binary to search pipelines.
+
+## Migration playbook
+
+1. Introduce optional fields needed by the new format.
+2. Run dual plugins (JSON + binary) temporarily and compare metrics.
+3. Point consumers to the new stream, then decommission the old plugin.
+
+Document the rationale and compatibility guarantees in your runbook so future teams understand how to decode historical payloads.

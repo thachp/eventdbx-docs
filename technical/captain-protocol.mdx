@@ -3,10 +3,55 @@ title: "Captain Protocol"
 description: "Deep dive into the Captain transport protocol powering replication."
 ---
 
-Describe framing, negotiation, retries, and versioning for the protocol.
+Captain is EventDBX’s replication protocol. It runs over TCP/TLS, multiplexes multiple streams, and keeps latency low even when nodes are far apart.
 
-## Topics to cover
+## Handshake
 
-- Explain the handshake, authentication, and timeout strategy.
-- Include diagrams for flow control and error handling.
-- Call out compatibility guarantees across protocol versions.
+1. Client opens a TLS connection and sends a `HELLO` frame with domain, token fingerprint, and protocol version.
+2. Server replies with `ACCEPT` plus configuration (max chunk size, compression, features).
+3. Both sides exchange Merkle roots for the requested aggregates to detect drift before transferring data.
+
+Example frame (JSON for illustration; actual wire format is binary):
+
+```json
+{
+  "type": "HELLO",
+  "domain": "payments-prod",
+  "version": 3,
+  "token": "sha256:c974..."
+}
+```
+
+## Flow control
+
+- Captain uses credit-based flow control. The receiver advertises how many chunks it can accept (`WINDOW` frames).
+- Senders batch up to `max_chunk_bytes` or `max_events` before flushing.
+- Heartbeats (`PING`/`PONG`) ensure idle connections stay alive; if they fail, the sender retries from the last acknowledged offset.
+
+## Error handling
+
+Common error frames:
+
+| Code | Meaning | Resolution |
+| --- | --- | --- |
+| `AUTH_FAILED` | Token invalid or lacks scope | Mint a new token scoped to replication. |
+| `HASH_MISMATCH` | Merkle roots differ | Run `dbx integrity scan` and repair before retrying. |
+| `BACKPRESSURE` | Receiver overwhelmed | Lower batch size or add more standby capacity. |
+
+Clients retry automatically with exponential backoff unless the error is fatal (auth, version mismatch).
+
+## Versioning
+
+Protocol versions are backwards compatible within a major release. The server negotiates the highest mutually supported version. Keep standbys up to date so you benefit from compression, delta encoding, and future optimizations.
+
+## Observability
+
+Captain emits metrics such as:
+
+- `captain_chunks_sent_total`
+- `captain_ack_latency_ms`
+- `captain_hash_mismatch_total`
+
+Scrape `/metrics` or subscribe to the audit log to keep an eye on replication health.
+
+Understanding Captain helps operators tune replication, debug stalls, and plan upgrades confidently.

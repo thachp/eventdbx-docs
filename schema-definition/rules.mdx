@@ -3,10 +3,45 @@ title: "Rules"
 description: "Write schema rules and validation logic that keep data trustworthy."
 ---
 
-Explain how rules attach to schemas, how to test them, and how to roll out changes.
+Rules add business context to raw column definitions. They enforce ranges, formats, cross-field dependencies, and custom validators.
 
-## Topics to cover
+## Global vs column rules
 
-- Explain global versus per-column rules plus ordering guarantees.
-- Include examples for regex, numeric ranges, and custom validators.
-- Note how rule changes propagate to historical data and what to do when they fail.
+- **Column rules** apply to a single field (`amount > 0`).
+- **Global rules** span multiple fields (`due_date > issued_at`).
+
+Define column rules inline:
+
+```bash
+dbx schema rule add invoice_issued amount --type range --min 0.01
+dbx schema rule add invoice_issued currency --type enum --values USD EUR GBP
+```
+
+Define global rules via scripts:
+
+```bash
+dbx schema rule add invoice_issued --type script --file ./rules/invoice.js
+```
+
+`invoice.js` exports a function that receives the payload + metadata and returns either `true` or an error message.
+
+## Testing rules
+
+Use fixtures before promoting to strict mode:
+
+```bash
+dbx schema rule test invoice_issued --input ./fixtures/invoice.json
+```
+
+Combine with CI to block changes that break validations.
+
+## Ordering and execution
+
+Rules execute in the order they were defined. Keep cheap validations (type checks, ranges) first so expensive scripts only run when necessary. Reorder by reapplying rules.
+
+## Handling failures
+
+- In permissive mode, failures log warnings and annotate the event with `@validation:false`.
+- In strict mode, the CLI rejects the event with the rule’s error message.
+
+Use this feedback loop to educate producers about expectations while giving you the option to enforce them once confident.

@@ -3,10 +3,58 @@ title: "Data Integrity"
 description: "Guarantee append-only behavior and verifiable state across replicas."
 ---
 
-Describe Merkle proofs, checksums, and validation routines that keep data trustworthy.
+Integrity comes from a combination of deterministic storage, cryptographic proofs, and operational guardrails. EventDBX makes drift obvious so you can repair it before it becomes a customer-facing issue.
 
-## Topics to cover
+## Per-aggregate Merkle trees
 
-- Call out how per-aggregate Merkle trees work and how to verify them with the CLI.
-- Highlight the difference between optimistic versus strict validation modes and when to toggle each.
-- Cover replication parity checks and how to repair drift when hashes diverge.
+Every aggregate maintains a Merkle tree built from event payload + metadata hashes. The root hash is persisted with each snapshot, giving you a single value to compare across nodes.
+
+```bash
+dbx aggregate merkle person p-110
+# => hash: 92e2b1... level: 7 events: 32
+```
+
+Compare two domains (for example, primary vs standby) by exporting the hash list:
+
+```bash
+dbx aggregate merkle person p-110 --json > primary.json
+dbx aggregate merkle person p-110 --json --domain standby > standby.json
+diff primary.json standby.json
+```
+
+Any divergence signals tampering or replication lag.
+
+## Validation modes
+
+- **Permissive**: Events always append, but warnings highlight schema mismatches. Best for prototypes.
+- **Strict**: Events that fail validation are rejected with actionable error messages. Enable this before launch.
+
+Switch modes per domain:
+
+```bash
+dbx restrict set strict --domain payments-prod
+dbx restrict set permissive --domain payments-dev
+```
+
+Strict mode pairs with CI pipelines that run `dbx schema lint` to catch regressions before deployment.
+
+## Checksums during replication
+
+`dbx push` and `dbx pull` exchange Merkle roots and highest offsets before transferring data. The receiving node validates snapshots as they arrive:
+
+```
+▶ dbx push standby --since 2024-05-01
+  sync aggregates.....done
+  verify hashes.......passed
+  updated standby root 92e2b1...
+```
+
+If verification fails, the command aborts and leaves the standby untouched. Operators can then rerun with `--repair` to re-stream affected aggregates only.
+
+## Inspecting and repairing drift
+
+1. Run `dbx integrity scan` to list aggregates whose Merkle roots no longer match snapshots.
+2. For each aggregate, replay events into a fresh snapshot using `dbx aggregate repair <type> <id>`.
+3. Re-run the scan to verify repairs and mark the incident in your audit log.
+
+Because EventDBX stores the entire history, you never lose the data needed to rebuild a consistent state.

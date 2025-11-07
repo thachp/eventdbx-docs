@@ -3,10 +3,59 @@ title: "Snapshots"
 description: "Materialize aggregate state efficiently with deterministic snapshots."
 ---
 
-Document why snapshots exist, how they relate to events, and how often to refresh them.
+Snapshots give you point-in-time state without replaying every event. EventDBX stores them alongside the event log and refreshes them automatically when needed.
 
-## Topics to cover
+## When snapshots rebuild
 
-- Explain snapshot semantics and when to let EventDBX rebuild them automatically.
-- Document commands for creating, inspecting, and pruning snapshots.
-- Call out sizing, retention, and compression strategies.
+- After a configurable number of events (`snapshot_stride`).
+- When an operator calls `dbx aggregate snapshot rebuild`.
+- When a plugin requests a payload slice that requires the latest state.
+
+```bash
+dbx aggregate snapshot rebuild invoice inv-9931
+dbx aggregate snapshot show invoice inv-9931 --format json
+```
+
+Snapshots include payload, metadata, Merkle root, and the index of the last applied event.
+
+## Storage layout
+
+Snapshots live in the same RocksDB column family as aggregates. Each entry stores:
+
+```
+{
+  "aggregate": "invoice",
+  "id": "inv-9931",
+  "version": 64,
+  "payload": {...},
+  "merkle_root": "a7f4...",
+  "updated_at": "2024-05-04T11:12:33Z"
+}
+```
+
+Compression keeps them small, so retaining several generations is cheap. Use `dbx snapshot prune` to drop old versions if you need to reclaim disk.
+
+## Tuning cadence
+
+- **High-churn aggregates** (carts, sessions): lower `snapshot_stride` to 5–10 events so plugins read fresh state quickly.
+- **Low-churn aggregates** (accounts, ledgers): keep stride high (100+) to minimize writes.
+- **Large payloads**: consider enabling incremental snapshots so only changed fields are persisted.
+
+Configure per aggregate type:
+
+```toml
+[aggregate.invoice]
+snapshot_stride = 25
+[aggregate.cart]
+snapshot_stride = 8
+```
+
+## Using snapshots downstream
+
+Plugins can request snapshots instead of replaying events:
+
+```toml
+selector = { include_snapshot = true, include_events = false }
+```
+
+Use this for read models that want current state (search indexes, caches) without caring about the entire history. If a downstream system falls behind, simply replay snapshots plus events from the last acknowledged offset.

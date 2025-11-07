@@ -3,10 +3,53 @@ title: "Process Plugin"
 description: "Spawn local processes per event for extreme customization."
 ---
 
-Document command templating, resource limits, and security considerations.
+The process plugin launches an executable for each event. It is powerful—anything you can script, you can run—but requires discipline to stay safe and performant.
 
-## Topics to cover
+## Configuration
 
-- Show how to template environment variables and payload files into commands.
-- Discuss sandboxing, ulimits, and timeout settings.
-- Share troubleshooting tips for stuck or misbehaving child processes.
+```toml
+[plugin.runbook]
+type = "process"
+command = "/opt/eventdbx/hooks/runbook.sh"
+args = ["{aggregate}", "{id}", "{event.type}"]
+env = {
+  EVENT_PAYLOAD = "{payload.json}",
+  EVENT_METADATA = "{metadata.json}"
+}
+selector = { domain = "ops", include_payload = true }
+timeout_ms = 5000
+```
+
+Placeholders insert event data into arguments or environment variables.
+
+## Use cases
+
+- Triggering legacy scripts that expect CLI input.
+- Writing to systems without native plugins (custom appliances, mainframes).
+- Running smoke tests whenever certain aggregates change.
+
+## Safety recommendations
+
+- Run the plugin under a dedicated user with tight permissions.
+- Enable resource limits: `cpu_quota`, `memory_limit_mb`, `max_concurrency`.
+- Capture stdout/stderr and ship them to a log aggregator for debugging.
+
+## Error handling
+
+- Exit code `0`: success (ACK).
+- Non-zero exit or timeout: the job is retried according to `retries`. Include structured error messages so on-call engineers know what happened.
+
+```bash
+echo '{"error":"pagerduty API timeout","retry_after":30}' >&2
+exit 2
+```
+
+## Observability
+
+- `plugin_process_concurrency`
+- `plugin_process_failures_total`
+- `plugin_process_duration_ms`
+
+Alert when failures spike—often a sign of downstream outages or bad code in the hook.
+
+Use the process plugin sparingly, but it is invaluable when you need to integrate EventDBX with systems that lack modern APIs.

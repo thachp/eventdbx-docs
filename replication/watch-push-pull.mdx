@@ -3,10 +3,54 @@ title: "Watch / Push / Pull"
 description: "Explain replication commands and automation patterns."
 ---
 
-Lay out how watch, push, and pull cooperate plus how to monitor them.
+Three commands cover replication needs: `watch` for streaming, `push` for proactive sync, and `pull` for recovery. Mix them to match your latency and workflow goals.
 
-## Topics to cover
+## watch
 
-- Document CLI syntax for `dbx watch`, `dbx push`, and `dbx pull`.
-- Cover scheduling, automation, and observability hooks.
-- Show failure recovery flows when transfers get interrupted.
+Streams changes continuously to a remote endpoint.
+
+```bash
+dbx watch standby-a --token $STANDBY_TOKEN
+```
+
+- Maintains a cursor so restarts resume where they left off.
+- Ideal for near-real-time DR and read-only replicas.
+- Emits metrics (`events_transferred`, `lag_seconds`) for dashboards.
+
+## push
+
+Initiates a one-off transfer from the active domain to a target. Common in controlled environments where the primary reaches out to secondaries.
+
+```bash
+dbx push standby-b --since 2024-05-01T00:00:00Z
+```
+
+Use `--aggregates subset.txt` to limit the transfer to critical data during incidents.
+
+## pull
+
+Runs from the standby to fetch updates, perfect for air-gapped or firewalled environments.
+
+```bash
+dbx pull primary --until now --verify
+```
+
+Pair with cron or workflow engines (GitHub Actions, Jenkins) to automate nightly syncs.
+
+## Monitoring and retries
+
+- Commands exit non-zero if verification fails; wrap them in scripts that retry with exponential backoff.
+- Log replication metrics to your observability stack. Example Prometheus scrape from `/metrics`:
+
+```
+eventdbx_replication_events_total{target="standby-a"} 123456
+eventdbx_replication_lag_seconds{target="standby-a"} 12
+```
+
+## Failure recovery
+
+1. Capture the failing offset from logs.
+2. Rerun `dbx push --since <offset>` or `dbx watch --resume-from <offset>`.
+3. If corruption is detected, rerun with `--repair` to rebuild affected aggregates only.
+
+Combining these commands lets you tailor replication for low-latency mirrors, offline backups, and everything in between.

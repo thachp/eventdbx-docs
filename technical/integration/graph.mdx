@@ -3,10 +3,52 @@ title: "Graph Integration"
 description: "Project events into graph databases or analytics stacks."
 ---
 
-Explain how to translate events into nodes/edges plus how to query them.
+Graph databases (Neo4j, JanusGraph, Neptune) unlock fraud detection, recommendation, and dependency analysis use cases. EventDBX aggregates supply the facts you need to build nodes and edges.
 
-## Topics to cover
+## Modeling patterns
 
-- Describe translating aggregates into graph structures (nodes, edges, properties).
-- Show TTL, merge, or upsert strategies for graph workloads.
-- Note sample Cypher or Gremlin snippets.
+- Aggregates → nodes (`Customer`, `Order`, `Payment`).
+- Relationships → edges derived from event metadata (`customer-ordered->order`, `order-paid-by->payment`).
+- Snapshots provide the latest node properties; events describe relationship changes over time.
+
+## Pipeline example
+
+1. TCP plugin streams events to a consumer.
+2. Consumer transforms each event into Cypher statements.
+
+```cypher
+MERGE (c:Customer {id: $customerId})
+MERGE (o:Order {id: $orderId})
+MERGE (c)-[:PLACED {at: $timestamp, version: $version}]->(o)
+```
+
+3. Batch statements to avoid chattiness and commit them inside a transaction.
+
+## Handling deletes
+
+Instead of deleting nodes, mark them inactive:
+
+```cypher
+MATCH (o:Order {id: $orderId})
+SET o.status = "CANCELLED", o.cancelledAt = $timestamp
+```
+
+This mirrors EventDBX’s append-only philosophy and keeps graph history intact.
+
+## Performance tips
+
+- Use metadata fields (`@tenant`, `@region`) as partition keys when writing to multi-tenant graphs.
+- Run periodic compaction tasks to prune superseded relationships if the graph grows too dense.
+- Monitor import lag with custom metrics comparing EventDBX versions vs graph timestamps.
+
+## Queries
+
+Once data lands in the graph, you can answer questions that are hard to express in relational stores:
+
+```cypher
+MATCH path = (c:Customer)-[:PLACED|PAID*..4]->(o:Order)
+WHERE c.id = "cust-22"
+RETURN path
+```
+
+Graph integrations add contextual insights to the raw events EventDBX captures.

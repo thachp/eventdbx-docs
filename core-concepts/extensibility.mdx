@@ -3,10 +3,45 @@ title: "Extensibility"
 description: "Extend EventDBX with plugins, adapters, and schema evolutions."
 ---
 
-Capture the extension points that let teams introduce new transports, schema rules, or automations.
+Extensibility comes from a narrow core surrounded by pluggable adapters. You can introduce new transports, validation rules, or automations without pausing the daemon.
 
-## Topics to cover
+## Plugin lifecycle hooks
 
-- Highlight plugin lifecycle hooks and custom payload filters.
-- Discuss adding new column types or validation routines without downtime.
-- Explain bridging EventDBX with existing buses or CDC pipelines.
+Plugins subscribe to the durable queue, dequeue events, and ack when work is done. A minimal HTTP plugin entry:
+
+```toml
+[plugin.crm-sync]
+type = "http"
+endpoint = "https://crm.internal/events"
+selector = { domain = "sales", include_payload = true }
+retries = { max_attempts = 12, backoff = "exponential" }
+```
+
+Custom transports extend the same interface: implement `Init`, `Handle(event)`, and `Shutdown` to participate in the queue lifecycle. Use the MCP server (see Technical section) to distribute secrets and monitor status centrally.
+
+## Schema extensions
+
+Need a custom column type or validation rule? Author it as a WASM module or drop a shared library into `plugins/validators`. EventDBX loads validators dynamically:
+
+```bash
+dbx validator install uuidv7 --path ./validators/libuuidv7.so
+dbx schema column add session session_id --type uuidv7
+```
+
+Legacy aggregates keep their original columns; new events adopt the richer type automatically.
+
+## Automation and tooling
+
+- **CLI wrappers**: script domain bootstrapping or replication checks in your preferred language; `dbx` emits JSON everywhere to make integration easy.
+- **SDKs**: use the TypeScript client or generate your own via OpenAPI; the RPC surface is intentionally small (aggregates, schemas, queue).
+- **Observability**: emit custom metrics from plugins, pipe audit logs into your APM, and correlate them with queue depth to determine whether to scale horizontally.
+
+## Bridging existing systems
+
+EventDBX plays nicely with message buses, CDC pipelines, and data warehouses:
+
+- Mirror events to Kafka with the process plugin + `kafka-producer.sh`.
+- Keep Elasticsearch in sync using the HTTP plugin with bulk endpoints.
+- Drive ETL jobs by tailing the log plugin output and loading it into your warehouse every hour.
+
+Because plugins operate asynchronously, slow downstream systems never block writers. You can add or replace integrations as your architecture evolves without rewriting aggregates or touching historical data.

@@ -3,10 +3,54 @@ title: "TCP Plugin"
 description: "Stream events over raw TCP sockets when latency matters most."
 ---
 
-Cover framing, acknowledgements, and deployment advice for the TCP plugin.
+The TCP plugin is the fastest way to push events to consumers that you control. It sends framed messages over a persistent TCP socket so there is no HTTP overhead.
 
-## Topics to cover
+## Configuration
 
-- Describe framing and acknowledgement strategies plus sample consumer code.
-- Mention TLS tunnels, stunnel, or WireGuard guidance for encryption.
-- Document throughput tuning knobs such as batch size, concurrency, and buffer lengths.
+```toml
+[plugin.risk-stream]
+type = "tcp"
+host = "risk-broker.internal"
+port = 7075
+tls = true
+selector = { domain = "payments", include_payload = true, include_snapshot = false }
+buffer = { max_events = 256, flush_interval_ms = 50 }
+```
+
+Set `tls=false` only when the link is already encrypted (WireGuard, SSH tunnel).
+
+## Message format
+
+Each frame includes a length prefix followed by a binary payload (MsgPack by default). Consumers can decode it with the official SDK or any MsgPack library.
+
+```python
+frame = conn.read_frame()
+event = msgpack.unpackb(frame.body)
+```
+
+Switch to JSON by setting `encoding = "json"` if you prefer readability over size.
+
+## Reliability
+
+- TCP keepalives detect dead links quickly.
+- The plugin batches multiple events in one frame to reduce syscalls; adjust `max_events` to tune throughput vs latency.
+- ACKs are optional; if your consumer sends `ACK <cursor>`, the plugin records it for observability.
+
+## Security
+
+When TLS is disabled, wrap the connection:
+
+```bash
+ssh -N -L 7075:risk-broker.internal:7075 bastion
+dbx plugin start risk-stream
+```
+
+Or run the plugin behind stunnel/WireGuard for persistent tunnels.
+
+## Monitoring
+
+- `plugin_tcp_bytes_sent_total`
+- `plugin_tcp_connections_active`
+- `plugin_tcp_reconnect_total`
+
+Alert on reconnect storms—they typically mean a firewall or consumer outage needs attention.

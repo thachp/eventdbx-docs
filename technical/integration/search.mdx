@@ -3,10 +3,58 @@ title: "Search Integration"
 description: "Index events or snapshots into search engines."
 ---
 
-Discuss Elastic, Meilisearch, and other engines plus how to keep them in sync.
+Search backends (Elastic, OpenSearch, Meilisearch) thrive on denormalized documents. EventDBX snapshots provide that structure, while events keep indexes up to date.
 
-## Topics to cover
+## Indexing strategies
 
-- Compare indexing strategies such as full rebuilds versus incremental upserts.
-- Document idempotent writes and dedupe keys.
-- Cover schema mapping between EventDBX columns and search fields.
+1. **Full rebuilds**: export snapshots nightly and reindex everything. Simple but expensive.
+2. **Incremental upserts**: stream changes via HTTP/TCP plugins and upsert documents per aggregate.
+3. **Hybrid**: run incremental updates and schedule a full rebuild weekly for sanity.
+
+## Mapping example (Elasticsearch)
+
+```json
+{
+  "mappings": {
+    "properties": {
+      "aggregate_id": { "type": "keyword" },
+      "customer": { "type": "keyword" },
+      "status": { "type": "keyword" },
+      "amount": { "type": "double" },
+      "issued_at": { "type": "date" }
+    }
+  }
+}
+```
+
+Store the aggregate version so you can deduplicate updates:
+
+```json
+{
+  "aggregate_id": "inv-991",
+  "version": 64,
+  "...": "..."
+}
+```
+
+## Delivery pipelines
+
+- HTTP plugin → Elastic `_bulk` endpoint (remember to batch lines for efficiency).
+- Process plugin → custom script that writes to Meilisearch via its REST API.
+- Log plugin → Logstash pipeline that parses NDJSON and indexes into OpenSearch.
+
+## Failure handling
+
+- Keep dedupe keys (`aggregate_id`, `version`) so replays do not duplicate entries.
+- If the index lags, replay snapshots from a known checkpoint:
+
+```bash
+dbx snapshot export --domain payments-prod --since 2024-05-01 | ./scripts/reindex.sh
+```
+
+## Monitoring
+
+- Track index lag by comparing the latest aggregate version in EventDBX vs the search cluster.
+- Alert on bulk request failures or queue depth spikes.
+
+With a clear strategy, search indexes stay fresh without overwhelming EventDBX or the search cluster.

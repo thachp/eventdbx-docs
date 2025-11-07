@@ -3,10 +3,35 @@ title: "Integration Overview"
 description: "Map the most common integration patterns on top of EventDBX."
 ---
 
-Set expectations for push, pull, and hybrid integrations before diving into individual transports.
+Integrations fall into two camps: push-based (plugins emit events as they happen) and pull-based (read models query snapshots or backups on demand). Most production setups mix both.
 
-## Topics to cover
+## Push patterns
 
-- Contrast pull-based read models with push-based fan-out.
-- Describe bridging EventDBX into service meshes or API gateways.
-- List credentials, IAM roles, and infrastructure prerequisites.
+- **Webhooks (HTTP plugin)**: notify CRMs, ticketing systems, or serverless functions in real time.
+- **Streams (TCP/CaPnP)**: keep caches, fraud systems, or ML features warm with minimal latency.
+- **Logs**: feed SIEMs, analytics, or compliance data lakes with append-only NDJSON.
+
+Push integrations provide immediacy but depend on plugin reliability and downstream health.
+
+## Pull patterns
+
+- `dbx snapshot export` for nightly analytics loads.
+- `dbx aggregate events ... --since` to replay only recent changes.
+- `dbx backup` pipelines for disaster recovery or data science sandboxes.
+
+Pull is simpler operationally because downstream systems can retry at will, but latency is higher.
+
+## Hybrid approach
+
+1. Push events to a queue (Kafka, NATS) via the process plugin.
+2. Downstream consumers replay from backups when they lag.
+3. Use metadata to detect replays and reconcile differences.
+
+## Planning questions
+
+- How fresh must downstream data be?
+- Do consumers need full history, current state, or both?
+- What are the failure domains and acceptable RPO/RTO?
+- Which teams own each integration—platform or feature squads?
+
+Answering these early prevents brittle architectures later. Dive into the specific guides (RESTful, GraphQL, Search, Graph, Custom) for concrete examples.

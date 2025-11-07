@@ -3,10 +3,40 @@ title: "Custom Integrations"
 description: "Build bespoke integrations when off-the-shelf ones are not enough."
 ---
 
-Provide a checklist for evaluating custom integrations and monitoring them in production.
+Sometimes you need to integrate with proprietary appliances, air-gapped systems, or workflows that defy categorization. Follow this checklist to design and maintain custom integrations responsibly.
 
-## Topics to cover
+## Evaluate the need
 
-- List questions to answer before authoring a new integration.
-- Point back to plugin scaffolding and SDK helpers.
-- Highlight monitoring, alerting, and rollback considerations.
+- Is the target system incompatible with existing plugins (HTTP/TCP/CaPnP/Process)?
+- Does the integration require complex stateful logic that belongs outside EventDBX?
+- Can you reuse an existing SDK or should you wrap the CLI?
+
+If the answer to all of these is “no”, prefer a standard plugin to keep operational load low.
+
+## Scaffolding
+
+1. Start with the process plugin or the official SDK to prototype quickly.
+2. Once requirements solidify, create a dedicated service that consumes events via TCP or HTTP.
+3. Document selectors, expected throughput, and retry behavior in your architecture repo.
+
+## Reliability checklist
+
+- Idempotency: use aggregate ID + version to deduplicate writes downstream.
+- Backpressure: expose metrics and cut over to a DLQ when the target system slows down.
+- Observability: emit structured logs and metrics (success/failure counts, latency) so on-call engineers can troubleshoot.
+
+## Security considerations
+
+- Store credentials in a central secret manager; rotate them automatically.
+- Encrypt traffic even inside private networks—custom integrations often bypass standard review.
+- Enforce least privilege: if the integration only needs read access, use a token scoped to `aggregate.read`.
+
+## Runbooks
+
+Document:
+
+- Deployment steps and rollback procedures.
+- How to replay events when the integration is down.
+- Contact information for the owning team.
+
+Custom integrations are powerful but should remain exceptions. Treat them like production services with proper code reviews, tests, and monitoring.

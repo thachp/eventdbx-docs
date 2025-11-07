@@ -3,10 +3,65 @@ title: "GraphQL Integration"
 description: "Expose EventDBX data via GraphQL resolvers and subscriptions."
 ---
 
-Describe schema modeling, resolver patterns, and backpressure when streaming events into GraphQL.
+GraphQL lets clients shape their own responses. Pair it with EventDBX to give product teams flexible access to aggregates, events, and derived projections.
 
-## Topics to cover
+## Schema modeling
 
-- Map aggregates to GraphQL types and connections.
-- Explain subscriptions, live queries, and handling backpressure.
-- Provide resolver snippets that call the CLI or SDK.
+Map aggregates to object types:
+
+```graphql
+type Invoice {
+  id: ID!
+  amount: Money!
+  status: InvoiceStatus!
+  issuedAt: DateTime!
+  events(limit: Int = 10, after: String): [InvoiceEvent!]!
+}
+```
+
+- Use `version` as the cursor for event connections.
+- Expose metadata fields that matter to clients (actor, correlation ID).
+
+## Resolvers
+
+- Query resolvers fetch snapshots via the CLI/SDK (`dbx aggregate show`).
+- Field resolvers lazy-load expensive sections (e.g., `events`).
+
+```ts
+const resolvers = {
+  Query: {
+    invoice: (_, { id }) => dbx.aggregate.show('invoice', id),
+  },
+  Invoice: {
+    events: (invoice, args) => fetchEvents(invoice.id, args),
+  },
+};
+```
+
+Cache resolver results in memory or Redis to keep latency low.
+
+## Subscriptions
+
+Use the TCP or HTTP plugin to push events into your GraphQL gateway. Subscriptions can then stream updates:
+
+```graphql
+subscription OnInvoiceEvent($id: ID!) {
+  invoiceEvent(id: $id) {
+    version
+    type
+    payload
+  }
+}
+```
+
+Mark replayed events with metadata so subscribers know whether the update is real-time or catch-up.
+
+## Backpressure
+
+Protect your GraphQL service by:
+
+- Limiting subscription fan-out per client.
+- Buffering events in an in-memory queue with eviction policies.
+- Emitting metrics (`subscription_lag_seconds`) to detect slow consumers.
+
+With careful schema design and resolver caching, GraphQL becomes a powerful façade over EventDBX without exposing the underlying complexity.

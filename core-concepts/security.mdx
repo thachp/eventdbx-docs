@@ -3,10 +3,54 @@ title: "Security"
 description: "Secure access, tokens, and encryption defaults for EventDBX clusters."
 ---
 
-Outline authentication, authorization, secret rotation, and transport security expectations.
+Security starts with the CLI and stretches through plugins and replication channels. EventDBX keeps the surface area small so you can reason about every credential and handshake.
 
-## Topics to cover
+## Token lifecycle
 
-- Explain token minting, rotation schedules, and how scopes map to CLI privileges.
-- Document recommended TLS or mTLS setups plus the config flags that enforce them.
-- List best practices for plugin credentials, environment secrets, and audit logging.
+Tokens use Ed25519 signatures tied to a domain, role, and optional expiry.
+
+```bash
+dbx token mint ops --role admin --ttl 30d --domain payments-prod > token.json
+```
+
+- Store the public key alongside your infrastructure-as-code so verification happens outside the daemon.
+- Rotate tokens by minting a replacement, deploying it, then revoking the original with `dbx token revoke <id>`.
+- Keep least privilege: schema authors do not need queue management permissions, and plugins should only receive selector-specific scopes.
+
+## Transport security
+
+- Terminate TLS directly in the daemon (`[server] tls_cert`, `tls_key`) or place it behind a mutually-authenticated proxy.
+- For intra-datacenter traffic, pair the TCP plugin with WireGuard or SSH tunnels so payloads stay encrypted even on untrusted links.
+- Require TLS for CLI connections by setting `dbx config set prefer_tls true`.
+
+## Secrets for plugins
+
+Each plugin can read secrets from environment variables or the MCP server. Preferred pattern:
+
+```toml
+[plugin.billing]
+type = "http"
+env = { AUTH_TOKEN = "secret:billing/token" }
+```
+
+The MCP server leases short-lived tokens and rotates them automatically. If you run plugins outside MCP, place secrets in a dedicated vault and inject them via your orchestrator (Kubernetes, Nomad, etc.).
+
+## Audit logging
+
+Enable structured audit logs with:
+
+```bash
+dbx config set audit.log_format jsonl
+dbx config set audit.include_payload_metadata true
+```
+
+The log includes command, domain, aggregate, and token fingerprint so you can trace every action. Ship it to your SIEM using the log plugin or forwarder of your choice.
+
+## Hardening checklist
+
+1. Lock down filesystem permissions so only the `dbx` user can read the data directory.
+2. Enable strict mode and schema validation before exposing the API to untrusted clients.
+3. Require MFA on the bastions where tokens are minted.
+4. Monitor unusual CLI commands (bulk deletes, global configuration changes) through the audit log.
+
+Following these practices keeps the EventDBX surface predictable even as teams and integrations grow.

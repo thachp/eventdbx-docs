@@ -3,10 +3,53 @@ title: "Log Plugin"
 description: "Append events to structured logs for SIEMs and audit warehouses."
 ---
 
-Explain log formats, rotation policies, and downstream ingestion patterns.
+The log plugin writes NDJSON entries to disk or stdout so existing log collectors can ingest EventDBX events.
 
-## Topics to cover
+## Configuration
 
-- Show JSON lines and NDJSON examples with metadata included.
-- Explain rotation, compression, and retention strategies.
-- Discuss when to prefer the log plugin over HTTP or TCP targets.
+```toml
+[plugin.audit-log]
+type = "log"
+path = "/var/log/eventdbx/audit.ndjson"
+rotate = { size_mb = 512, files = 10, compress = true }
+selector = { include_payload = true, include_snapshot = false, metadata = { "@sensitivity" = "audit" } }
+```
+
+Set `path = "-"` to stream to stdout and let your supervisor capture it.
+
+## Log format
+
+Each line includes context for correlation:
+
+```json
+{
+  "ts": "2024-05-07T12:00:11.123Z",
+  "domain": "payments-prod",
+  "aggregate": "invoice",
+  "id": "inv-991",
+  "event": { "type": "invoice_paid", "version": 64 },
+  "metadata": { "@actor": "svc-invoice", "@correlation": "req-8821" },
+  "hash": "92e2b1..."
+}
+```
+
+Toggle payload and snapshot inclusion to fit your compliance model.
+
+## Shipping logs
+
+- Use Fluent Bit, Vector, or Logstash to tail the file and forward to your SIEM (Splunk, Datadog, Elastic).
+- Include `hash` and `version` fields so analysts can line up logs with aggregate proofs.
+
+## Rotation & retention
+
+- Rotate files before they exceed your collector’s limits.
+- Compress older logs and push them to object storage for long-term retention.
+- Mirror rotation settings with your system log policy so they integrate cleanly.
+
+## When to use
+
+- Regulatory reporting that requires human-readable trails.
+- Ad-hoc debugging in lower environments.
+- Feeding data warehouses where ingestion jobs already expect NDJSON.
+
+The log plugin trades delivery guarantees for simplicity, so pair it with another transport (HTTP/TCP) when you need exactly-once guarantees.

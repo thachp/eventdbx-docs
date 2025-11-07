@@ -3,10 +3,52 @@ title: "CaPnP Plugin"
 description: "Serialize payloads with Cap'n Proto for compact delivery."
 ---
 
-Explain how schemas map to Cap'n Proto definitions and how consumers decode them.
+The CaPnP plugin converts events into Cap'n Proto messages before shipping them. It is ideal for high-throughput consumers that need strong schemas and low CPU overhead.
 
-## Topics to cover
+## Setup
 
-- Show how to generate Cap'n Proto schemas from EventDBX columns.
-- Outline CLI flags or config toggles that enable the encoder.
-- Cover compatibility guarantees when schemas evolve.
+1. Export schemas:
+
+```bash
+dbx schema export --format capnp --aggregate invoice > schemas/invoice.capnp
+```
+
+2. Share the `.capnp` files with downstream services; they will generate language-specific bindings.
+
+3. Configure the plugin:
+
+```toml
+[plugin.analytics-capnp]
+type = "capnp"
+endpoint = "tcp+tls://analytics.internal:7555"
+schema_dir = "/etc/eventdbx/schemas"
+selector = { include_payload = true, include_snapshot = false }
+```
+
+## Message structure
+
+Each message contains:
+
+- `AggregateEnvelope` with `type`, `id`, `version`, `timestamp`.
+- `EventRecord` describing the event and metadata.
+- Optional `SnapshotRecord`.
+
+The structure matches the exported schema, so consumers can read it with zero reflection.
+
+## Compatibility
+
+- Adding optional fields preserves compatibility; required fields should not be removed.
+- When breaking changes are unavoidable, bump the major version of the schema and run two plugins (old + new) until consumers migrate.
+
+## Performance tips
+
+- Set `batch_bytes` to 256 KB or higher for better throughput.
+- Keep schema directories in tmpfs to reduce disk I/O if you rotate schemas frequently.
+- Monitor `plugin_capnp_encode_time_ms` to catch regressions.
+
+## Troubleshooting
+
+- Schema mismatch errors usually mean the consumer is on an older commit. Compare `schema_hash` in the plugin logs with the consumer.
+- If encoding fails for a specific aggregate, run `dbx schema validate --event <type>` to confirm the payload matches the schema definition.
+
+This plugin delivers binary efficiency without sacrificing the safety of strongly typed payloads.

@@ -15,12 +15,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": [
-              "index",
-              "features",
-              "quickstart",
-              "deployment"
-            ]
+            "pages": ["index", "features", "quickstart", "deployment"]
           },
           {
             "group": "Core Concepts",
@@ -37,12 +32,11 @@
             "pages": [
               "technical/captain-protocol",
               "technical/mcp-server",
-              "technical/mcp-server/xxx",
               "technical/plugins"
             ]
           },
           {
-            "group": "Integration",
+            "group": "Extensions",
             "pages": [
               "technical/integration/restful",
               "technical/integration/graphql",
@@ -53,9 +47,7 @@
           },
           {
             "group": "Contributing",
-            "pages": [
-              "contributing"
-            ]
+            "pages": ["contributing"]
           }
         ]
       },
@@ -64,9 +56,7 @@
         "groups": [
           {
             "group": "Command line",
-            "pages": [
-              "cli-reference/introduction"
-            ]
+            "pages": ["cli-reference/introduction"]
           }
         ]
       }
