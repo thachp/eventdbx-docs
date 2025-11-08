@@ -1,127 +1,78 @@
-EventDBX ships as a single CLI named `dbx`. You can run everything with `npx`, but installing globally keeps the command available everywhere. Follow these six steps to go from a clean machine to a replicated domain with a working aggregate.
+---
+title: "Quickstart"
+description: "Install the `dbx` CLI, start the daemon, mint a token, and write your first aggregate."
+---
+
+EventDBX ships as a single CLI named `dbx`. Follow the steps below to go from zero to a running daemon with authenticated client access.
 
 <Steps>
 
-<Step title="Start the server">
+<Step title="Install and start the daemon">
 
 ```bash
-npm install eventdbx -g
+npm install -g eventdbx
 dbx start --foreground
 ```
 
-- Omit `--foreground` to run as a daemon.
-- Override storage with `--data-dir <path>` (defaults to `$HOME/.eventdbx`).
-- Pick a validation mode with `--restrict=<off|default|strict>`; `default` enforces a schema when one exists.
+- Omit `--foreground` to run as a background service.
+- Use `--restrict=strict` once your schemas are locked in.
+- Logs stream to stdout; press `Ctrl+C` to stop the daemon when running in the foreground.
 
 </Step>
 
-<Step title="Switch domains (optional)">
+<Step title="Mint a token">
+
+Tokens grant CLI, SDK, and plugin access. Mint one for local development, export it, and keep the JSON for audit purposes.
 
 ```bash
-dbx checkout -d herds
+dbx token generate --group admin --user admin --action "*.*"
 ```
 
-- The default domain stores data under `<data_dir>/domains/default`.
-- Domain names are case-insensitive, alphanumeric, and may include `-` or `_`.
-- Rerunning checkout against the current domain is a no-op, so you can script context switches freely.
+- Use `--action "*.*"` for scoped access.
+- Revoke tokens with `dbx token revoke <id>` if they leak.
+- CI pipelines can mint short-lived tokens with `--ttl 10m`.
 
 </Step>
 
-<Step title="Define a schema">
+<Step title="Connect with the JavaScript SDK">
 
-```bash
-dbx schema create person \
-  --events person_created,person_updated \
-  --snapshot-threshold 100
+```ts
+import { createClient } from "eventdbxjs";
+
+const client = createClient({
+  ip: process.env.EVENTDBX_HOST ?? "127.0.0.1",
+  port: Number(process.env.EVENTDBX_PORT) || 6363,
+  token: process.env.EVENTDBX_TOKEN,
+});
+
+await client.connect();
+
+await client.create("person", "p-110", "person_created", {
+  payload: {
+    fist_name: "Demo",
+    last_name: "Demo",
+    email: "jane@example.com",
+  },
+  metadata: { "@createdBy": "<current-id>" },
+  note: "person created by <email>",
+});
+
+const history = await client.events("person", "p-110");
+console.log("Event count:", history.length);
+
+await client.disconnect();
 ```
 
-Schemas live in `~/.eventdbx/data/schemas.json` (or your chosen `data_dir`). Inspect one at any time:
-
-```bash
-dbx schema person
-```
-
-```json
-{
-  "person": {
-    "aggregate": "person",
-    "snapshot_threshold": null,
-    "events": {
-      "person_created": { "fields": ["first_name", "last_name"] },
-      "person_updated": { "fields": [] }
-    },
-    "column_types": {
-      "email": { "type": "text", "required": true, "format": "email" },
-      "name": { "type": "text", "rules": { "length": { "min": "1", "max": "64" } } }
-    }
-  }
-}
-```
-
-Use schemas to lock fields, hide payload slices, or freeze writes entirely (`locked: true`).
-
-</Step>
-
-<Step title="Issue a token">
-
-```bash
-dbx token generate --group admin --user jane --expiration 3600
-```
-
-Tokens are signed with an Ed25519 key pair defined under `[auth]` in `config.toml`. Keep the private key secret and distribute the public key to services that validate tokens.
-
-</Step>
-
-<Step title="Append events">
-
-```bash
-dbx aggregate apply person p-002 person_updated \
-  --field name="Jane Doe" \
-  --field status=active
-```
-
-- When the server is running, the CLI proxies writes through the control socket; otherwise it writes to the local RocksDB store.
-- Filter and inspect history at any time:
-
-```bash
-dbx events --filter 'payload.status = "active"' --sort created_at:desc --take 5
-```
-
-Stream a single event as JSON via `dbx events <snowflake_id> --json`.
-
-</Step>
-
-<Step title="Replicate or sync domains">
-
-```bash
-dbx checkout -d remote1 \
-  --remote 10.0.0.42:6363 \
-  --token "$(cat ~/.eventdbx/replica.token)"
-```
-
-Push schemas first to keep validation consistent:
-
-```bash
-dbx push schema remote1
-dbx push remote1 --aggregate ledger --id ledger-001
-```
-
-Pull data back down with the same integrity checks:
-
-```bash
-dbx pull remote1 --aggregate invoice
-```
-
-Need automation? `dbx watch remote1 --mode bidirectional --interval 120 --background` runs forever (or once with `--run-once`), respects concurrency flags, and exposes state via `dbx watch status <domain>`.
+Swap in the Python, Java, PHP, .NET, or Go SDKs described on the Client SDKs page if you prefer another language.
 
 </Step>
 
 </Steps>
 
-## What to explore next
+## Next steps
 
-- **Snapshot thresholds**: Omit `--snapshot-threshold` to inherit `config.toml`. Use `dbx aggregate snapshot` for manual checkpoints.
-- **Staging events**: `dbx aggregate apply --stage` queues writes in `.eventdbx/staged_events.json`. Commit them together with `dbx aggregate commit`.
-- **Verification**: `dbx aggregate verify` recomputes the Merkle root for an aggregate; mismatches point to tampering or divergent history.
+- **Snapshots and verification**: `dbx aggregate snapshot rebuild` refreshes state, and `dbx aggregate verify` recomputes Merkle roots when you need to prove integrity.
+- **Replication**: run `dbx watch standby` to stream changes to a standby node, or `dbx push/pull` for scheduled syncs.
+- **Plugins**: configure HTTP or TCP plugins to fan events out to downstream services once your domain is populated.
 
-<Note>Every CLI command accepts `--config <path>` if you need to target an alternate configuration file.</Note>
+<Note>Every CLI command accepts `--config <path>` if you need to target a custom configuration file or environment.</Note>

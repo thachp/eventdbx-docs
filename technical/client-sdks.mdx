@@ -1,0 +1,155 @@
+---
+title: "Client SDKs"
+description: "Use the official EventDBX client libraries across Python, Java, PHP, .NET, and Go."
+---
+
+Every SDK exposes the same primitives—connect, authenticate, create aggregates, append events, and stream history. Pick the language that matches your service stack and follow the quickstart below.
+
+<Info>You can always fall back to the CLI or REST API, but SDKs wrap retries, pagination, and typing so product engineers ship faster.</Info>
+
+## Python
+
+```bash
+pip install eventdbx
+```
+
+```python
+from eventdbx import Client
+
+client = Client(
+    host="payments.internal",
+    port=6363,
+    token=os.environ["EVENTDBX_TOKEN"],
+    domain="payments-prod",
+)
+
+snapshot = client.create(
+    aggregate="invoice",
+    aggregate_id="inv-991",
+    event="invoice_issued",
+    payload={"amount": 4200, "currency": "USD"},
+    metadata={"@actor": "svc-invoice"},
+)
+print(snapshot.version)
+```
+
+Features:
+
+- Async + sync APIs.
+- Typed payload helpers via `pydantic`.
+- Built-in retry with exponential backoff.
+
+## Java
+
+```xml
+<dependency>
+  <groupId>com.eventdbx</groupId>
+  <artifactId>eventdbx-client</artifactId>
+  <version>0.5.0</version>
+</dependency>
+```
+
+```java
+EventDbx client = EventDbx.builder()
+    .host("payments.internal")
+    .port(6363)
+    .token(System.getenv("EVENTDBX_TOKEN"))
+    .domain("payments-prod")
+    .build();
+
+client.aggregate("invoice")
+      .apply("inv-991", "invoice_paid", Map.of("amount", 4200));
+```
+
+Features:
+
+- Reactor and CompletableFuture support for reactive stacks.
+- Pluggable serializers (Jackson, Gson, your own).
+- Micrometer metrics out of the box.
+
+## PHP
+
+```bash
+composer require eventdbx/eventdbx
+```
+
+```php
+$client = new EventDbx\Client([
+    'host' => 'payments.internal',
+    'port' => 6363,
+    'token' => $_ENV['EVENTDBX_TOKEN'],
+    'domain' => 'payments-prod',
+]);
+
+$client->aggregate('invoice')->apply('inv-991', 'invoice_refunded', [
+    'payload' => ['amount' => 1000],
+    'metadata' => ['@actor' => 'csr-22'],
+]);
+```
+
+Features:
+
+- Laravel/Symfony service providers.
+- Automatic JSON encoding with depth limits.
+- Middleware hooks for logging and tracing.
+
+## .NET
+
+```powershell
+dotnet add package EventDBX.Client
+```
+
+```csharp
+var client = new EventDbxClient(new EventDbxOptions {
+    Host = "payments.internal",
+    Port = 6363,
+    Token = Environment.GetEnvironmentVariable("EVENTDBX_TOKEN"),
+    Domain = "payments-prod",
+});
+
+await client.Aggregates["invoice"]
+    .ApplyAsync("inv-991", "invoice_discount_applied", new {
+        amount = 300,
+        reason = "Loyalty"
+    });
+```
+
+Features:
+
+- `IHostedService` integration for background workers.
+- Polly-based resilience policies.
+- Source generators for strongly typed aggregates.
+
+## Go
+
+```bash
+go get github.com/eventdbx/client-go
+```
+
+```go
+cli := eventdbx.NewClient(eventdbx.Config{
+    Host:  "payments.internal",
+    Port:  6363,
+    Token: os.Getenv("EVENTDBX_TOKEN"),
+    Domain: "payments-prod",
+})
+
+err := cli.Aggregate("invoice").Apply(ctx, "inv-991", "invoice_settled", eventdbx.Event{
+    Payload: map[string]any{"amount": 4200},
+    Metadata: map[string]any{"@actor": "svc-clearing"},
+})
+```
+
+Features:
+
+- Context-aware calls for cancellation/timeouts.
+- Native channels for streaming events.
+- OTEL instrumentation helpers.
+
+## Common patterns
+
+- **Configuration**: Defer host/port/token to environment variables or service discovery.
+- **Retries**: All SDKs expose hooks to adjust retry counts and logging; align them with your SLOs.
+- **Testing**: Use the embedded EventDBX test harness (`dbx sandbox start`) plus SDK test utilities to stub responses.
+
+If your language is missing, open an issue or follow the SDK template in `sdk/examples` to build your own.

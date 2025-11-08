@@ -1,15 +1,13 @@
 ---
-title: 'Deployment & integration'
-description: 'Run EventDBX under Docker, wire up client libraries, and operate the daemon in production.'
+title: "Deployment & integration"
+description: "Run EventDBX under Docker, wire up client libraries, and operate the daemon in production."
 ---
-
-This page collects the operational bits that typically live beside the CLI quickstart: containerised runtimes, language clients, security defaults, and observability hooks.
 
 ## Run with Docker
 
 ```bash
 # Pull the latest published release
-docker pull thachp/eventdbx:tagname
+docker pull thachp/eventdbx:latest
 
 # Start the daemon with persistent storage and required ports
 docker run \
@@ -18,21 +16,25 @@ docker run \
   --publish 7070:7070 \
   --publish 6363:6363 \
   --volume "$PWD/data:/var/lib/eventdbx" \
-  thachp/eventdbx:tagname
+  thachp/eventdbx:latest
 ```
 
 - Mount a persistent volume so Merkle trees, schemas, and queued jobs survive restarts.
 - Port `7070` exposes the HTTP API; `6363` is the control socket the CLI and plugins hit.
 - Pass `--env EVENTDBX_RESTRICT=strict` or update `config.toml` inside the volume to enforce schema validation globally.
 
-<Tip>The Docker image bundles the same `dbx` binary as the CLI, so you can exec into the container and run administrative commands without installing extra tooling.</Tip>
+<Tip>
+  The Docker image bundles the same `dbx` binary as the CLI, so you can exec
+  into the container and run administrative commands without installing extra
+  tooling.
+</Tip>
 
 ## JavaScript/TypeScript client
 
 Install the official library with `pnpm add eventdbxjs` (or your preferred package manager) and bootstrap the client as soon as you have host + token details:
 
 ```ts
-import { createClient } from 'eventdbxjs';
+import { createClient } from "eventdbxjs";
 
 const client = createClient({
   ip: process.env.EVENTDBX_HOST,
@@ -43,19 +45,19 @@ const client = createClient({
 
 await client.connect();
 
-const snapshot = await client.create('person', 'p-110', 'person_registered', {
-  payload: { name: 'Jane Doe', status: 'active' },
-  metadata: { '@source': 'seed-script' },
-  note: 'seed aggregate',
+const snapshot = await client.create("person", "p-110", "person_registered", {
+  payload: { name: "Jane Doe", status: "active" },
+  metadata: { "@source": "seed-script" },
+  note: "seed aggregate",
 });
 
-await client.apply('person', 'p-110', 'person_contact_added', {
-  payload: { name: 'Jane Doe', status: 'active' },
-  metadata: { note: 'seed data' },
+await client.apply("person", "p-110", "person_contact_added", {
+  payload: { name: "Jane Doe", status: "active" },
+  metadata: { note: "seed data" },
 });
 
-const history = await client.events('person', 'p-110');
-console.log('event count:', history.length);
+const history = await client.events("person", "p-110");
+console.log("event count:", history.length);
 ```
 
 Tokens can be passed inline (`--token`), exported as `EVENTDBX_TOKEN`, or minted automatically when the CLI proxies through a running server.

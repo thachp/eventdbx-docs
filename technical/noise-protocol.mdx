@@ -1,0 +1,55 @@
+---
+title: "Noise Protocol"
+description: "Understand how EventDBX uses the Noise framework for encrypted transport between nodes and plugins."
+---
+
+Noise is a flexible cryptographic framework for building custom handshakes. EventDBX uses a `Noise_XXpsk3_25519_ChaChaPoly_BLAKE2s` pattern whenever sensitive channels require mutual authentication without relying on TLS.
+
+## Why Noise?
+
+- **Small footprint** – fits into sidecar binaries and embedded agents that cannot afford a full TLS stack.
+- **PSK support** – lets operators rotate pre-shared keys per plugin or replication target.
+- **Deterministic configuration** – Noise handshakes are defined by concise patterns, making audits straightforward.
+
+## Handshake flow
+
+1. Both peers agree on a pre-shared key (`psk_id`). MCP distributes these secrets to authorized agents.
+2. The initiator sends an `e`phemeral key, encrypted with the PSK.
+3. The responder verifies the PSK, returns its own ephemeral key, and proves identity with a static key signed by the MCP CA.
+4. Both sides derive symmetric session keys for payload and header encryption.
+
+Pseudo-code:
+
+```text
+-> e
+<- e, ee, s, es, psk
+-> s, se, psk
+```
+
+The session keys roll automatically every N messages (configurable, default 1 024) to minimize key reuse.
+
+## Configuration
+
+Enable Noise on replication or plugin channels by referencing a shared profile:
+
+```toml
+[noise.default]
+pattern = "Noise_XXpsk3_25519_ChaChaPoly_BLAKE2s"
+psk = "secret://noise/default"
+key_rotation_messages = 1024
+
+[replication.standby-wan]
+transport = "tcp+noise"
+noise_profile = "default"
+endpoint = "standby.example.com:7443"
+```
+
+Secrets live in your vault or MCP server (`secret://` URIs). Rotate PSKs with `mcp secret rotate noise/default`.
+
+## Operational guidance
+
+- Monitor `noise_handshake_failures_total`; spikes usually indicate mismatched PSKs or stale agent certificates.
+- Log handshake fingerprints only in debug mode—never expose raw keys.
+- For zero-trust networks, combine Noise with mutual TLS so each layer protects against different classes of attacks.
+
+Noise complements, rather than replaces, TLS. Use it when you need lightweight, PSK-backed encryption or when regulators require explicit control over cryptographic primitives.

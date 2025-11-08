@@ -1,6 +1,6 @@
 ---
-title: 'CLI reference'
-description: 'Complete guide to the dbx command surface—lifecycle, schemas, aggregates, events, plugins, and upgrades.'
+title: "CLI reference"
+description: "Complete guide to the dbx command surface—lifecycle, schemas, aggregates, events, plugins, and upgrades."
 ---
 
 The `dbx` CLI is the single entry point for starting the daemon, managing schemas, writing events, and supervising plugins. Every command accepts `--config <path>` if you need to target a non-default configuration file.
@@ -12,8 +12,6 @@ The `dbx` CLI is the single entry point for starting the daemon, managing schema
 - `dbx status` – print port, PID, uptime, and restriction mode.
 - `dbx restart [start options…]` – stop then start with new options.
 - `dbx destroy [--yes]` – remove the PID file, data dir, and config after confirmation.
-- `dbx checkout -d <domain>` – switch the active domain. Creates storage roots under `<data_dir>/domains/<domain>`.
-- `dbx merge --from <domain> [--into <domain>] [--overwrite-schemas]` – copy events + schemas from one domain into another. Existing aggregates abort unless explicitly overwritten.
 
 ## Configuration
 
@@ -22,6 +20,11 @@ The `dbx` CLI is the single entry point for starting the daemon, managing schema
 - First invocation should set a 32-byte base64 DEK so payloads, snapshots, and `tokens.json` are encrypted.
 - `--list-page-size` changes the default page size for `aggregate list`; `--page-limit` caps any requested page.
 - `--plugin-max-attempts` controls how many retries occur before a job becomes “dead”.
+
+## Domains
+
+- `dbx checkout -d <domain>` – switch the active domain. Creates storage roots under `<data_dir>/domains/<domain>`.
+- `dbx merge --from <domain> [--into <domain>] [--overwrite-schemas]` – copy events + schemas from one domain into another. Existing aggregates abort unless explicitly overwritten.
 
 ## Tokens
 

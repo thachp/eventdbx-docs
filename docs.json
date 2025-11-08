@@ -31,7 +31,9 @@
             "group": "Technical",
             "pages": [
               "technical/captain-protocol",
+              "technical/noise-protocol",
               "technical/mcp-server",
+              "technical/client-sdks",
               "technical/plugins"
             ]
           },

@@ -1,5 +1,5 @@
 ---
-title: "EventDBX overview"
+title: "Overview"
 description: "Meet the event-sourced write-side database built for immutable audit trails and pluggable read models."
 ---
 
@@ -12,7 +12,10 @@ EventDBX is an append-only, event-sourced write store that keeps your aggregates
 - **Schema enforcement on your terms** – switch between permissive prototyping and strict production validation with a single flag.
 - **Operationally simple** – domains isolate data, CLI commands cover schema/state management, and replication honors version + Merkle parity.
 
-<Tip>The CLI binary is `dbx`; older releases exposed an `eventdbx` alias, but `dbx` is the canonical entry point.</Tip>
+<Tip>
+  The CLI binary is `dbx`; older releases exposed an `eventdbx` alias, but `dbx`
+  is the canonical entry point.
+</Tip>
 
 ## Architecture at a glance
 
@@ -24,19 +27,28 @@ EventDBX is an append-only, event-sourced write store that keeps your aggregates
 
 <CardGroup cols={3}>
   <Card title="Spin it up" icon="rocket" href="/quickstart">
-    Follow the CLI quickstart to start the daemon, define schemas, and append your first events.
+    Follow the CLI quickstart to start the daemon, define schemas, and append
+    your first events.
   </Card>
   <Card title="Understand the surface area" icon="circle-info" href="/features">
-    Explore built-in capabilities—immutability, encryption, restriction modes, performance, and column types.
+    Explore built-in capabilities—immutability, encryption, restriction modes,
+    performance, and column types.
   </Card>
   <Card title="Operate & integrate" icon="server" href="/deployment">
-    Run EventDBX under Docker, issue tokens, connect TypeScript clients, and schedule replication jobs.
+    Run EventDBX under Docker, issue tokens, connect TypeScript clients, and
+    schedule replication jobs.
   </Card>
   <Card title="Plugins" icon="shuffle" href="/plugins/overview">
-    Learn how plugin instances consume the job queue, configure payload slices, and replay events.
+    Learn how plugin instances consume the job queue, configure payload slices,
+    and replay events.
   </Card>
-  <Card title="CLI reference" icon="terminal" href="/cli-reference/introduction">
-    Browse every `dbx` command grouped by lifecycle, schemas, aggregates, events, plugins, and upgrades.
+  <Card
+    title="CLI reference"
+    icon="terminal"
+    href="/cli-reference/introduction"
+  >
+    Browse every `dbx` command grouped by lifecycle, schemas, aggregates,
+    events, plugins, and upgrades.
   </Card>
 </CardGroup>
 
@@ -44,11 +56,11 @@ EventDBX is an append-only, event-sourced write store that keeps your aggregates
 
 EventDBX keeps throughput flat even as datasets grow past 10 M records thanks to RocksDB batching and hot-aggregate caching.
 
-| Engine | Throughput (ops/s) | Latency (µs) | Notes |
-| --- | --- | --- | --- |
-| **EventDBX** | **1 400 – 2 000** | **0.5 – 0.8** | Append-only core plus caching keeps latency sub-microsecond. |
-| PostgreSQL 15 | 1 000 – 1 900 | 0.6 – 1.0 | Strong baseline, heavier planner/WAL overhead. |
-| MongoDB 7 | 400 – 1 000 | 1.5 – 2.5 | Flexible JSON store with higher serialization cost. |
-| SQL Server 2022 | 50 – 180 | 5 – 20 | Drops quickly past 100 K ops because of locking + B-trees. |
+| Engine          | Throughput (ops/s) | Latency (µs)  | Notes                                                        |
+| --------------- | ------------------ | ------------- | ------------------------------------------------------------ |
+| **EventDBX**    | **1 400 – 2 000**  | **0.5 – 0.8** | Append-only core plus caching keeps latency sub-microsecond. |
+| PostgreSQL 15   | 1 000 – 1 900      | 0.6 – 1.0     | Strong baseline, heavier planner/WAL overhead.               |
+| MongoDB 7       | 400 – 1 000        | 1.5 – 2.5     | Flexible JSON store with higher serialization cost.          |
+| SQL Server 2022 | 50 – 180           | 5 – 20        | Drops quickly past 100 K ops because of locking + B-trees.   |
 
 Benchmarks come from the [eventdbx-perf](https://github.com/thachp/eventdbx-perf) suite (Dockerized backends, single-threaded clients, datasets up to 10 M records).

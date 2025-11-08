@@ -1,5 +1,5 @@
 ---
-title: "Engine features"
+title: "Features"
 description: "Dive into EventDBX capabilities: immutable storage, validation modes, column types, and performance characteristics."
 ---
 
@@ -20,11 +20,11 @@ EventDBX focuses on the write side of CQRS so you can capture every mutation as 
 
 EventDBX enforces schemas based on the restriction mode you choose at startup (`dbx start --restrict=<mode>`):
 
-| Mode | Flag | Description |
-| --- | --- | --- |
-| **Off** | `--restrict=off` or `false` | No validation. Ideal for prototyping when schemas are still evolving. |
+| Mode        | Flag                           | Description                                                                                                                                   |
+| ----------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Off**     | `--restrict=off` or `false`    | No validation. Ideal for prototyping when schemas are still evolving.                                                                         |
 | **Default** | `--restrict=default` or `true` | Validates whenever a schema exists but allows aggregates without one. Matches legacy behaviour and helps teams roll out validation gradually. |
-| **Strict** | `--restrict=strict` | Every aggregate must declare a schema before events can be appended. Missing schemas fail fast with clear errors. |
+| **Strict**  | `--restrict=strict`            | Every aggregate must declare a schema before events can be appended. Missing schemas fail fast with clear errors.                             |
 
 Switch modes without migrating data; just restart the daemon with the desired flag.
 
@@ -32,18 +32,18 @@ Switch modes without migrating data; just restart the daemon with the desired fl
 
 Schemas are powered by a `column_types` map that defines both storage type and validation rules.
 
-| Type | Accepted input | Notes |
-| --- | --- | --- |
-| `integer` | JSON numbers or strings that parse to signed 64-bit integers | Rejects values outside the `i64` range. |
-| `float` | JSON numbers or numeric strings | Stored as `f64`; accepts scientific notation. |
-| `decimal(precision,scale)` | JSON numbers or strings | Enforces total digits ≤ precision and fractional digits ≤ scale. |
-| `boolean` | JSON booleans, `0/1`, `"true"`, `"false"` | Normalized to literal `true`/`false`. |
-| `text` | UTF-8 strings | Combine with `length`, `contains`, or `regex`. |
-| `timestamp` | RFC 3339 timestamps | Normalized to UTC. |
-| `date` | `YYYY-MM-DD` strings | Parsed as calendar dates without timezones. |
-| `json` | Any JSON value | No per-field validation; store free-form payloads. |
-| `binary` | Base64-encoded strings | Rules operate on decoded byte lengths. |
-| `object` | JSON objects | Enable nested validation with the `properties` rule. |
+| Type                       | Accepted input                                               | Notes                                                            |
+| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `integer`                  | JSON numbers or strings that parse to signed 64-bit integers | Rejects values outside the `i64` range.                          |
+| `float`                    | JSON numbers or numeric strings                              | Stored as `f64`; accepts scientific notation.                    |
+| `decimal(precision,scale)` | JSON numbers or strings                                      | Enforces total digits ≤ precision and fractional digits ≤ scale. |
+| `boolean`                  | JSON booleans, `0/1`, `"true"`, `"false"`                    | Normalized to literal `true`/`false`.                            |
+| `text`                     | UTF-8 strings                                                | Combine with `length`, `contains`, or `regex`.                   |
+| `timestamp`                | RFC 3339 timestamps                                          | Normalized to UTC.                                               |
+| `date`                     | `YYYY-MM-DD` strings                                         | Parsed as calendar dates without timezones.                      |
+| `json`                     | Any JSON value                                               | No per-field validation; store free-form payloads.               |
+| `binary`                   | Base64-encoded strings                                       | Rules operate on decoded byte lengths.                           |
+| `object`                   | JSON objects                                                 | Enable nested validation with the `properties` rule.             |
 
 Rules you can layer on a column:
 
@@ -59,15 +59,15 @@ Rules you can layer on a column:
 
 Most commands boil down to a handful of RocksDB reads/writes. Use the table below when planning workloads or sizing clusters:
 
-| Operation | Time complexity | Notes |
-| --- | --- | --- |
-| `aggregate list` | O(k) | `k` = requested page size (defaults to `list_page_size`). |
-| `aggregate get` | O(log N + Eₐ + P) | One state read plus optional event scan and JSON parsing. |
-| `aggregate select` | O(log N + P_selected) | Same state read as `get`; dot-path traversal is in-memory. |
-| `aggregate apply` | O(P) | Payload validation + merge + append in one batch write. |
-| `aggregate patch` | O(log N + P + patch_ops) | Reads current state, applies JSON Patch, appends delta. |
-| `aggregate replay` | O(Eₐ) | Linear in the streamed events for that aggregate. |
-| `aggregate verify` | O(Eₐ) | Recomputes the Merkle root across events. |
+| Operation          | Time complexity          | Notes                                                      |
+| ------------------ | ------------------------ | ---------------------------------------------------------- |
+| `aggregate list`   | O(k)                     | `k` = requested page size (defaults to `list_page_size`).  |
+| `aggregate get`    | O(log N + Eₐ + P)        | One state read plus optional event scan and JSON parsing.  |
+| `aggregate select` | O(log N + P_selected)    | Same state read as `get`; dot-path traversal is in-memory. |
+| `aggregate apply`  | O(P)                     | Payload validation + merge + append in one batch write.    |
+| `aggregate patch`  | O(log N + P + patch_ops) | Reads current state, applies JSON Patch, appends delta.    |
+| `aggregate replay` | O(Eₐ)                    | Linear in the streamed events for that aggregate.          |
+| `aggregate verify` | O(Eₐ)                    | Recomputes the Merkle root across events.                  |
 
 Staged events live in `.eventdbx/staged_events.json`. Queue them with `aggregate apply --stage`, preview with `aggregate list --stage`, and flush the entire batch via `aggregate commit` for all-or-nothing persistence.
 
