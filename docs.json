@@ -3,9 +3,9 @@
   "theme": "mint",
   "name": "EventDBX",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#1e293b",
+    "light": "#f8fafc",
+    "dark": "#334155"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -42,14 +42,12 @@
             "pages": [
               "technical/integration/restful",
               "technical/integration/graphql",
-              "technical/integration/search",
-              "technical/integration/graph",
               "technical/integration/customs"
             ]
           },
           {
             "group": "Contributing",
-            "pages": ["contributing"]
+            "pages": ["Guidelines", "license"]
           }
         ]
       },

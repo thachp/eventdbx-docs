@@ -1,6 +1,6 @@
 ---
-title: "Captain Protocol"
-description: "Deep dive into the Captain transport protocol powering replication."
+title: "Cap’n Proto"
+description: "Deep dive into the Cap’n Proto transport protocol powering replication."
 ---
 
 Captain is EventDBX’s replication protocol. It runs over TCP/TLS, multiplexes multiple streams, and keeps latency low even when nodes are far apart.
@@ -32,11 +32,11 @@ Example frame (JSON for illustration; actual wire format is binary):
 
 Common error frames:
 
-| Code | Meaning | Resolution |
-| --- | --- | --- |
-| `AUTH_FAILED` | Token invalid or lacks scope | Mint a new token scoped to replication. |
-| `HASH_MISMATCH` | Merkle roots differ | Run `dbx integrity scan` and repair before retrying. |
-| `BACKPRESSURE` | Receiver overwhelmed | Lower batch size or add more standby capacity. |
+| Code            | Meaning                      | Resolution                                           |
+| --------------- | ---------------------------- | ---------------------------------------------------- |
+| `AUTH_FAILED`   | Token invalid or lacks scope | Mint a new token scoped to replication.              |
+| `HASH_MISMATCH` | Merkle roots differ          | Run `dbx integrity scan` and repair before retrying. |
+| `BACKPRESSURE`  | Receiver overwhelmed         | Lower batch size or add more standby capacity.       |
 
 Clients retry automatically with exponential backoff unless the error is fatal (auth, version mismatch).
 
